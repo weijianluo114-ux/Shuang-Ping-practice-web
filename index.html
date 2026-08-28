@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="本地离线双拼练习工具：小鹤、自然码、智能ABC、微软双拼键位图，声母/韵母/音节/词语/句子/文章练习，无登录无广告。">
+<title>双拼练习 · 本地版</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <span class="logo">⌨️</span>
+    <div class="brand-text">
+      <h1>双拼练习</h1>
+      <p>两键一字 · 纯本地 · 无登录无广告</p>
+    </div>
+  </div>
+  <div class="scheme-picker" id="scheme-picker"></div>
+  <button class="icon-btn" id="btn-settings" title="设置 (Ctrl+I)">⚙️</button>
+</header>
+
+<nav class="tabs">
+  <button class="tab active" data-view="keyboard">键位图</button>
+  <button class="tab" data-view="drills">键位记忆</button>
+  <button class="tab" data-view="practice">综合练习</button>
+  <button class="tab" data-view="article">文章</button>
+  <button class="tab" data-view="stats">我的统计</button>
+</nav>
+
+<main>
+  <!-- 键位图 -->
+  <section id="view-keyboard" class="view active">
+    <div class="scheme-hero" id="scheme-hero"></div>
+    <div class="keyboard-wrap" id="keyboard"></div>
+    <div class="key-detail" id="key-detail">
+      <p>点击任意键帽查看该键承担的声母与韵母；敲击实体键盘会高亮对应键位。</p>
+    </div>
+    <div class="help-card" id="scheme-rule"></div>
+  </section>
+
+  <!-- 键位记忆 -->
+  <section id="view-drills" class="view">
+    <div class="mode-chips" id="drill-modes">
+      <button data-drill="initial" class="active">声母</button>
+      <button data-drill="final">韵母</button>
+      <button data-drill="zero">零声母</button>
+    </div>
+    <div class="drill-card">
+      <div class="drill-progress">
+        <span id="drill-progress-text">0 / 0</span>
+        <div class="bar"><i id="drill-bar"></i></div>
+      </div>
+      <div class="drill-target">
+        <div class="drill-kind" id="drill-kind">声母</div>
+        <div class="drill-big" id="drill-target-label">zh</div>
+        <div class="drill-code" id="drill-code-slots"></div>
+        <div class="drill-feedback" id="drill-feedback">按对应键位开始</div>
+      </div>
+      <div class="drill-actions">
+        <button class="btn ghost" id="btn-drill-reset">重新开始 (Esc)</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 综合练习 -->
+  <section id="view-practice" class="view">
+    <div class="practice-setup card" id="practice-setup">
+      <div class="mode-chips" id="practice-modes">
+        <button data-mode="syll" class="active">音节</button>
+        <button data-mode="word">词语</button>
+        <button data-mode="sentence">句子</button>
+        <button data-mode="custom">自定义</button>
+      </div>
+      <div class="setup-row" id="setup-row-syll">
+        <label>本轮数量
+          <select id="round-size">
+            <option value="20">20 个</option>
+            <option value="30" selected>30 个</option>
+            <option value="50">50 个</option>
+          </select>
+        </label>
+        <label>词语数量
+          <select id="word-size">
+            <option value="10">10 个</option>
+            <option value="15" selected>15 个</option>
+            <option value="25">25 个</option>
+          </select>
+        </label>
+        <button class="btn primary" id="btn-start-round">开始练习</button>
+      </div>
+      <div class="setup-row" id="setup-row-custom" hidden>
+        <textarea id="custom-input" rows="3" placeholder="粘贴空格分隔的拼音，例如：ni hao shuang pin lian xi"></textarea>
+        <button class="btn primary" id="btn-start-custom">开始练习</button>
+      </div>
+    </div>
+
+    <div class="practice-area" id="practice-area" hidden>
+      <div class="practice-top">
+        <div class="live-stats" id="live-stats"></div>
+        <button class="btn ghost" id="btn-practice-reset">再来一轮</button>
+      </div>
+      <div class="progress-bar"><i id="progress-fill"></i></div>
+      <div class="stage" id="stage"></div>
+      <div class="practice-foot">
+        <span class="notice">💡 请把输入法保持在<b>英文输入</b>状态再敲击</span>
+        <button class="btn" id="btn-change-mode">更换模式</button>
+      </div>
+    </div>
+
+    <div class="finish-overlay" id="finish-overlay" hidden>
+      <div class="finish-card">
+        <h2>本轮完成 🎉</h2>
+        <div class="finish-grid" id="finish-grid"></div>
+        <div class="wrong-keys" id="wrong-keys"></div>
+        <div class="finish-actions">
+          <button class="btn primary" id="btn-again">再来一轮</button>
+          <button class="btn ghost" id="btn-finish-close">关闭</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 文章练习 -->
+  <section id="view-article" class="view">
+    <div class="article-setup" id="article-setup">
+      <div class="card art-intro">
+        <h2>文章练习</h2>
+        <p>看汉字敲双拼：整段文字逐字推进，当前字高亮，上方显示拼音提示（可在设置里关闭），标点与空格自动跳过。选一篇开始，敲完一段再看速度与准确率。</p>
+      </div>
+      <div id="article-list"></div>
+      <div class="card art-custom-card">
+        <h3>✍️ 自定义文本</h3>
+        <textarea id="art-custom-text" rows="4" placeholder="粘贴或输入任意中文……空行会分成新的段落"></textarea>
+        <div class="art-custom-actions">
+          <button class="btn primary" id="btn-art-custom">练习这段文字</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="practice-area" id="article-area" hidden>
+      <div class="practice-top">
+        <div class="art-title" id="art-title"></div>
+        <div class="live-stats" id="art-live"></div>
+        <button class="btn ghost" id="btn-art-exit">退出 (Esc)</button>
+      </div>
+      <div class="progress-bar"><i id="art-progress"></i></div>
+      <div class="art-text" id="art-text"></div>
+      <div class="practice-foot">
+        <span class="notice">💡 输入法保持<b>英文状态</b> · 标点自动跳过 · 退格可回改上一字</span>
+      </div>
+    </div>
+
+    <div class="finish-overlay" id="art-finish" hidden>
+      <div class="finish-card">
+        <h2>文章完成 🎉</h2>
+        <div class="art-finish-title" id="art-finish-title"></div>
+        <div class="finish-grid" id="art-finish-grid"></div>
+        <div class="wrong-keys" id="art-wrong-keys"></div>
+        <div class="finish-actions">
+          <button class="btn primary" id="btn-art-again">再练一次</button>
+          <button class="btn ghost" id="btn-art-list">返回文章列表</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 统计 -->
+  <section id="view-stats" class="view">
+    <div class="stats-cards" id="stats-cards"></div>
+    <div class="stats-panel" id="stats-daily"></div>
+    <div class="stats-panel" id="stats-keys"></div>
+  </section>
+</main>
+
+<footer>本地离线版 · 数据只保存在你浏览器的 localStorage 中，不上传任何内容</footer>
+
+<!-- 设置弹窗 -->
+<div class="modal-backdrop" id="modal" hidden>
+  <div class="modal">
+    <h2>设置</h2>
+    <label class="set-row">
+      <span>键位提示<small>练习中灰显下一键提示</small></span>
+      <input type="checkbox" id="set-hint">
+    </label>
+    <label class="set-row">
+      <span>按键音效</span>
+      <input type="checkbox" id="set-sound">
+    </label>
+    <label class="set-row">
+      <span>主题</span>
+      <select id="set-theme">
+        <option value="auto">跟随系统</option>
+        <option value="light">浅色</option>
+        <option value="dark">深色</option>
+      </select>
+    </label>
+    <div class="set-row between">
+      <span>清除练习记录</span>
+      <button class="btn danger" id="btn-clear-data">清除</button>
+    </div>
+    <div class="modal-actions">
+      <button class="btn primary" id="btn-modal-close">完成</button>
+    </div>
+  </div>
+</div>
+
+<script src="pinyin-pro.min.js"></script>
+<script src="articles.js"></script>
+<script src="app.js"></script>
+<script src="article.js"></script>
+</body>
+</html>

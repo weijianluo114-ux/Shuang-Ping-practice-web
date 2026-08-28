@@ -295,6 +295,22 @@
     $("#art-progress").style.width = (total ? done / total * 100 : 0) + "%";
   }
 
+  function smoothSpeedPath(pts) {
+    if (pts.length < 2) return "";
+    let d = `M ${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}`;
+    for (let i = 0; i < pts.length - 1; i++) {
+      const p0 = pts[Math.max(i - 1, 0)];
+      const p1 = pts[i];
+      const p2 = pts[i + 1];
+      const p3 = pts[Math.min(i + 2, pts.length - 1)];
+      const c1x = p1[0] + (p2[0] - p0[0]) / 6;
+      const c1y = p1[1] + (p2[1] - p0[1]) / 6;
+      const c2x = p2[0] - (p3[0] - p1[0]) / 6;
+      const c2y = p2[1] - (p3[1] - p1[1]) / 6;
+      d += ` C ${c1x.toFixed(1)},${c1y.toFixed(1)} ${c2x.toFixed(1)},${c2y.toFixed(1)} ${p2[0].toFixed(1)},${p2[1].toFixed(1)}`;
+    }
+    return d;
+  }
   function updateSpeedChart() {
     const el = $("#art-speed");
     if (!el) return;
@@ -304,8 +320,9 @@
       return;
     }
     const w = Math.max(el.clientWidth || 600, 100);
-    const h = 40;
-    const max = Math.max.apply(null, data.concat([60]));
+    const h = Math.max((el.clientHeight || 120) - 12, 60);
+    const rawMax = Math.max.apply(null, data.concat([60]));
+    const max = Math.min(rawMax, 200);
     let shape;
     if (data.length === 1) {
       const x = w / 2, y = h - Math.min(data[0] / max, 1) * (h - 4);
@@ -314,11 +331,11 @@
       const pts = data.map((v, i) => {
         const x = (i / (data.length - 1)) * w;
         const y = h - Math.min(v / max, 1) * (h - 4);
-        return `${x.toFixed(1)},${y.toFixed(1)}`;
+        return [x, y];
       });
-      const line = pts.join(" ");
-      const area = `0,${h} ${line} ${w},${h}`;
-      shape = `<polygon points="${area}" fill="var(--accent-soft)"/><polyline points="${line}" fill="none" stroke="var(--accent)" stroke-width="2"/>`;
+      const line = smoothSpeedPath(pts);
+      const area = `${line} L ${w.toFixed(1)},${h} L 0,${h} Z`;
+      shape = `<path d="${area}" fill="var(--accent-soft)"/><path d="${line}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`;
     }
     el.innerHTML = `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" class="speed-svg">${shape}</svg>`;
   }

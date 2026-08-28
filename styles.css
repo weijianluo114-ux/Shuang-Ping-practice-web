@@ -287,6 +287,7 @@ footer{max-width:1060px;margin:0 auto;padding:0 22px 34px;color:var(--muted);fon
   .key .lab{font-size:9px}
   .drill-big{font-size:42px}
   .finish-grid{grid-template-columns:repeat(2,1fr)}
+  #article-area{min-height:calc(100vh - 196px)}
 }
 /* ================= 文章练习 ================= */
 .article-setup{max-width:1060px;margin:0 auto;padding:0 22px}
@@ -310,8 +311,8 @@ footer{max-width:1060px;margin:0 auto;padding:0 22px 34px;color:var(--muted);fon
 .art-custom-actions{display:flex;justify-content:flex-end;margin-top:10px}
 
 /* 三栏练习布局：两侧控件 + 中间正文 */
-#article-area{padding:12px 0 0}
-.art-layout{display:grid;grid-template-columns:minmax(150px,210px) minmax(0,1fr) minmax(110px,150px);gap:14px;align-items:start;padding:0 12px}
+#article-area{display:flex;flex-direction:column;min-height:calc(100vh - 164px);padding:12px 0 0}
+.art-layout{flex:1 1 auto;display:grid;grid-template-columns:minmax(150px,210px) minmax(0,1fr) minmax(110px,150px);gap:14px;align-items:start;padding:0 12px}
 .art-side{position:sticky;top:78px;display:flex;flex-direction:column;gap:12px}
 .art-side.right{align-items:flex-end}
 .art-title{font-size:18px;font-weight:700;line-height:1.5}
@@ -357,7 +358,7 @@ footer{max-width:1060px;margin:0 auto;padding:0 22px 34px;color:var(--muted);fon
 .art-text.nohint .py{visibility:hidden}
 
 /* 底部迷你键盘 */
-.art-bottom{margin-top:16px;display:flex;flex-direction:column;gap:10px;padding:0 12px}
+.art-bottom{margin-top:auto;display:flex;flex-direction:column;gap:10px;padding:0 12px 8px}
 .art-bottom .notice{text-align:center}
 .art-kb{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 12px;box-shadow:var(--shadow);overflow-x:auto}
 .art-kb .kb-row{display:flex;gap:4px;justify-content:center;margin:3px 0}

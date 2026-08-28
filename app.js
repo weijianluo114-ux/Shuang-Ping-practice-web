@@ -842,14 +842,20 @@ function applyArticleFont() {
   document.documentElement.style.setProperty("--art-weight", settings.articleBold ? "700" : "500");
 }
 const FONT_SIZES = { small: "14px", normal: "16px", large: "18px", xlarge: "20px", xxlarge: "22px" };
+const FONT_SIZE_PX = ["12","13","14","15","16","17","18","19","20","21","22","23","24","26","28"];
+function normalizeFontSize(v) {
+  if (FONT_SIZES[v]) return FONT_SIZES[v].replace("px", "");
+  if (v && FONT_SIZE_PX.includes(String(v))) return String(v);
+  return "18";
+}
 function applyFontSize() {
-  document.documentElement.style.fontSize = FONT_SIZES[settings.fontSize] || FONT_SIZES.large;
+  document.documentElement.style.fontSize = normalizeFontSize(settings.fontSize) + "px";
 }
 function openModal() {
   $("#set-hint").checked = !!settings.hint;
   $("#set-sound").checked = !!settings.sound;
   $("#set-theme").value = settings.theme;
-  $("#set-fs").value = settings.fontSize || "large";
+  $("#set-fs").value = normalizeFontSize(settings.fontSize);
   $("#set-font").value = settings.articleFont || "system";
   $("#set-bold").checked = !!settings.articleBold;
   $("#modal").hidden = false;
@@ -858,7 +864,7 @@ function closeModal() {
   settings.hint = $("#set-hint").checked;
   settings.sound = $("#set-sound").checked;
   settings.theme = $("#set-theme").value;
-  settings.fontSize = $("#set-fs").value;
+  settings.fontSize = normalizeFontSize($("#set-fs").value);
   settings.articleFont = $("#set-font").value;
   settings.articleBold = $("#set-bold").checked;
   lsSet(LS_KEYS.settings, settings);

@@ -360,9 +360,9 @@ footer{max-width:1060px;margin:0 auto;padding:0 22px 34px;color:var(--muted);fon
 .art-text.nohint .py{visibility:hidden}
 
 /* 底部迷你键盘 */
-.art-bottom{margin-top:auto;display:flex;flex-direction:column;gap:10px;padding:0 12px 8px}
+.art-bottom{margin-top:auto;display:flex;flex-direction:column;align-items:center;gap:10px;padding:0 12px 8px}
 .art-bottom .notice{text-align:center}
-.art-kb{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 12px;box-shadow:var(--shadow);overflow-x:auto}
+.art-kb{width:fit-content;max-width:100%;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 12px;box-shadow:var(--shadow);overflow-x:auto}
 .art-kb .kb-row{display:flex;gap:4px;justify-content:center;margin:3px 0}
 .art-kb .key{width:46px;min-width:36px;height:50px;border-radius:9px;padding:3px 2px;gap:1px}
 .art-kb .key .letter{font-size:0.75rem}

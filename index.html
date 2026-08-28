@@ -146,15 +146,26 @@
             <label class="mini-row"><input type="checkbox" id="art-hint" checked><span>拼音提示</span></label>
             <label class="mini-row"><input type="checkbox" id="art-seg" checked><span>逐段模式</span></label>
             <label class="mini-row"><span>字体</span>
-              <select id="art-font">
-                <option value="system">系统默认</option>
+              <select id="art-font"><option value="system">系统默认</option>
                 <option value="SimSun">宋体</option>
+                <option value="NSimSun">新宋体</option>
                 <option value="SimHei">黑体</option>
+                <option value="Microsoft YaHei">微软雅黑</option>
+                <option value="Microsoft JhengHei">微软正黑体</option>
                 <option value="KaiTi">楷体</option>
                 <option value="FangSong">仿宋</option>
-                <option value="Microsoft YaHei">微软雅黑</option>
+                <option value="DengXian">等线</option>
+                <option value="STSong">华文宋体</option>
+                <option value="STZhongsong">华文中宋</option>
+                <option value="STKaiti">华文楷体</option>
+                <option value="STFangsong">华文仿宋</option>
+                <option value="STHeiti">华文黑体</option>
+                <option value="STXihei">华文细黑</option>
+                <option value="YouYuan">幼圆</option>
+                <option value="LiSu">隶书</option>
               </select>
             </label>
+            <label class="mini-row"><input type="checkbox" id="art-bold"><span>粗体</span></label>
           </div>
           <div class="art-side-actions">
             <button class="btn ghost" id="btn-art-list-side">返回列表</button>
@@ -235,14 +246,28 @@
     </label>
     <label class="set-row">
       <span>文章字体</span>
-      <select id="set-font">
-        <option value="system">系统默认</option>
-        <option value="SimSun">宋体</option>
-        <option value="SimHei">黑体</option>
-        <option value="KaiTi">楷体</option>
-        <option value="FangSong">仿宋</option>
-        <option value="Microsoft YaHei">微软雅黑</option>
+      <select id="set-font"><option value="system">系统默认</option>
+                  <option value="SimSun">宋体</option>
+                  <option value="NSimSun">新宋体</option>
+                  <option value="SimHei">黑体</option>
+                  <option value="Microsoft YaHei">微软雅黑</option>
+                  <option value="Microsoft JhengHei">微软正黑体</option>
+                  <option value="KaiTi">楷体</option>
+                  <option value="FangSong">仿宋</option>
+                  <option value="DengXian">等线</option>
+                  <option value="STSong">华文宋体</option>
+                  <option value="STZhongsong">华文中宋</option>
+                  <option value="STKaiti">华文楷体</option>
+                  <option value="STFangsong">华文仿宋</option>
+                  <option value="STHeiti">华文黑体</option>
+                  <option value="STXihei">华文细黑</option>
+                  <option value="YouYuan">幼圆</option>
+                  <option value="LiSu">隶书</option>
       </select>
+    </label>
+    <label class="set-row">
+      <span>文章粗体</span>
+      <input type="checkbox" id="set-bold">
     </label>
     <div class="set-row between">
       <span>清除练习记录</span>

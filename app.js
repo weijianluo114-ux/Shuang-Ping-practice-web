@@ -229,7 +229,7 @@ function lsSet(key, value) {
 
 let schemeId = lsGet(LS_KEYS.scheme, "xiaohe");
 let currentScheme = SCHEMES.find(s => s.id === schemeId) || SCHEMES[0];
-let settings = Object.assign({ hint: true, sound: true, theme: "auto", fontSize: "large", articleFont: "system", articleSegmented: true }, lsGet(LS_KEYS.settings, {}));
+let settings = Object.assign({ hint: true, sound: true, theme: "auto", fontSize: "large", articleFont: "system", articleBold: false, articleSegmented: true }, lsGet(LS_KEYS.settings, {}));
 let currentView = "keyboard";
 
 /* 练习引擎 */
@@ -821,13 +821,25 @@ function applyTheme(theme) {
 const ARTICLE_FONTS = {
   system: `"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,sans-serif`,
   SimSun: `SimSun,"宋体",serif`,
+  NSimSun: `NSimSun,"新宋体",serif`,
   SimHei: `SimHei,"黑体",sans-serif`,
+  "Microsoft YaHei": `"Microsoft YaHei","微软雅黑","PingFang SC",sans-serif`,
+  "Microsoft JhengHei": `"Microsoft JhengHei","微软正黑体",sans-serif`,
   KaiTi: `KaiTi,"楷体",serif`,
   FangSong: `FangSong,"仿宋",serif`,
-  "Microsoft YaHei": `"Microsoft YaHei","微软雅黑",sans-serif`
+  DengXian: `DengXian,"等线",sans-serif`,
+  STSong: `STSong,"华文宋体",serif`,
+  STZhongsong: `STZhongsong,"华文中宋",serif`,
+  STKaiti: `STKaiti,"华文楷体",serif`,
+  STFangsong: `STFangsong,"华文仿宋",serif`,
+  STHeiti: `STHeiti,"华文黑体",sans-serif`,
+  STXihei: `STXihei,"华文细黑",sans-serif`,
+  YouYuan: `YouYuan,"幼圆",sans-serif`,
+  LiSu: `LiSu,"隶书",serif`
 };
 function applyArticleFont() {
   document.documentElement.style.setProperty("--art-font", ARTICLE_FONTS[settings.articleFont] || ARTICLE_FONTS.system);
+  document.documentElement.style.setProperty("--art-weight", settings.articleBold ? "700" : "500");
 }
 const FONT_SIZES = { small: "14px", normal: "16px", large: "18px", xlarge: "20px", xxlarge: "22px" };
 function applyFontSize() {
@@ -839,6 +851,7 @@ function openModal() {
   $("#set-theme").value = settings.theme;
   $("#set-fs").value = settings.fontSize || "large";
   $("#set-font").value = settings.articleFont || "system";
+  $("#set-bold").checked = !!settings.articleBold;
   $("#modal").hidden = false;
 }
 function closeModal() {
@@ -847,6 +860,7 @@ function closeModal() {
   settings.theme = $("#set-theme").value;
   settings.fontSize = $("#set-fs").value;
   settings.articleFont = $("#set-font").value;
+  settings.articleBold = $("#set-bold").checked;
   lsSet(LS_KEYS.settings, settings);
   applyTheme(settings.theme);
   applyFontSize();

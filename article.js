@@ -166,6 +166,7 @@
     $("#art-hint").checked = !!settings.hint;
     $("#art-seg").checked = !!settings.articleSegmented;
     $("#art-font").value = settings.articleFont || "system";
+    $("#art-bold").checked = !!settings.articleBold;
     if (typeof applyArticleFont === "function") applyArticleFont();
     $("#art-title").innerHTML = escapeHtml(title) + (byline ? ` <small>· ${escapeHtml(byline)}</small>` : "");
     renderText();
@@ -652,6 +653,8 @@
     if (segEl) segEl.checked = !!settings.articleSegmented;
     const fontEl = $("#art-font");
     if (fontEl) fontEl.value = settings.articleFont || "system";
+    const boldEl = $("#art-bold");
+    if (boldEl) boldEl.checked = !!settings.articleBold;
     if (typeof applyArticleFont === "function") applyArticleFont();
     if (A.session) refreshHints();
   }
@@ -693,6 +696,11 @@
   });
   $("#art-font").addEventListener("change", e => {
     settings.articleFont = e.target.value;
+    lsSet(LS_KEYS.settings, settings);
+    if (typeof applyArticleFont === "function") applyArticleFont();
+  });
+  $("#art-bold").addEventListener("change", e => {
+    settings.articleBold = e.target.checked;
     lsSet(LS_KEYS.settings, settings);
     if (typeof applyArticleFont === "function") applyArticleFont();
   });

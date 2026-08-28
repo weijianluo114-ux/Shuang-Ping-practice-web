@@ -229,7 +229,7 @@ function lsSet(key, value) {
 
 let schemeId = lsGet(LS_KEYS.scheme, "xiaohe");
 let currentScheme = SCHEMES.find(s => s.id === schemeId) || SCHEMES[0];
-let settings = Object.assign({ hint: true, sound: true, theme: "auto", articleFont: "system", articleSegmented: true }, lsGet(LS_KEYS.settings, {}));
+let settings = Object.assign({ hint: true, sound: true, theme: "auto", fontSize: "large", articleFont: "system", articleSegmented: true }, lsGet(LS_KEYS.settings, {}));
 let currentView = "keyboard";
 
 /* 练习引擎 */
@@ -829,10 +829,15 @@ const ARTICLE_FONTS = {
 function applyArticleFont() {
   document.documentElement.style.setProperty("--art-font", ARTICLE_FONTS[settings.articleFont] || ARTICLE_FONTS.system);
 }
+const FONT_SIZES = { small: "14px", normal: "16px", large: "18px", xlarge: "20px", xxlarge: "22px" };
+function applyFontSize() {
+  document.documentElement.style.fontSize = FONT_SIZES[settings.fontSize] || FONT_SIZES.large;
+}
 function openModal() {
   $("#set-hint").checked = !!settings.hint;
   $("#set-sound").checked = !!settings.sound;
   $("#set-theme").value = settings.theme;
+  $("#set-fs").value = settings.fontSize || "large";
   $("#set-font").value = settings.articleFont || "system";
   $("#modal").hidden = false;
 }
@@ -840,9 +845,11 @@ function closeModal() {
   settings.hint = $("#set-hint").checked;
   settings.sound = $("#set-sound").checked;
   settings.theme = $("#set-theme").value;
+  settings.fontSize = $("#set-fs").value;
   settings.articleFont = $("#set-font").value;
   lsSet(LS_KEYS.settings, settings);
   applyTheme(settings.theme);
+  applyFontSize();
   applyArticleFont();
   $("#modal").hidden = true;
   if (window.ArticlePractice) ArticlePractice.onSettings();
@@ -937,6 +944,7 @@ function bindEvents() {
 
 /* ================= 启动 ================= */
 applyTheme(settings.theme);
+applyFontSize();
 applyArticleFont();
 applySchemeColor();
 renderSchemePicker();

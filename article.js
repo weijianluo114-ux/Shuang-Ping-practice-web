@@ -158,7 +158,7 @@
     A.sessionStartIdx = first;
     A.active = true; A.finished = false; A.started = false;
     A.stats = { correct: 0, wrong: 0, itemsDone: 0, bestCombo: 0, combo: 0, wrongKeys: {} };
-    A.speeds = []; A.lastCharTime = 0;
+    A.speeds = []; A.speedWrong = []; A.lastCharTime = 0;
     resetArtTimer();
     $("#article-setup").hidden = true;
     $("#article-area").hidden = false;
@@ -311,6 +311,17 @@
     }
     return d;
   }
+  function splitSpeedSegments(pts, flags) {
+    const out = [];
+    let i = 0;
+    while (i < pts.length) {
+      const wrong = !!flags[i];
+      const seg = [];
+      while (i < pts.length && !!flags[i] === wrong) { seg.push(pts[i]); i++; }
+      out.push({ wrong, pts: seg });
+    }
+    return out;
+  }
   function updateSpeedChart() {
     const el = $("#art-speed");
     if (!el) return;
@@ -319,6 +330,7 @@
       el.innerHTML = `<div class="speed-empty">开始输入后，这里会显示每字速度曲线（越快越高）</div>`;
       return;
     }
+    const flags = (A.speedWrong || []).slice(-60);
     const w = Math.max(el.clientWidth || 600, 100);
     const h = Math.max((el.clientHeight || 120) - 12, 60);
     const rawMax = Math.max.apply(null, data.concat([60]));
@@ -326,7 +338,8 @@
     let shape;
     if (data.length === 1) {
       const x = w / 2, y = h - Math.min(data[0] / max, 1) * (h - 4);
-      shape = `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3" fill="var(--accent)"/>`;
+      const col = flags[0] ? "var(--bad)" : "var(--accent)";
+      shape = `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3" fill="${col}"/>`;
     } else {
       const pts = data.map((v, i) => {
         const x = (i / (data.length - 1)) * w;
@@ -335,12 +348,22 @@
       });
       const line = smoothSpeedPath(pts);
       const area = `${line} L ${w.toFixed(1)},${h} L 0,${h} Z`;
-      shape = `<path d="${area}" fill="var(--accent-soft)"/><path d="${line}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`;
+      let strokes = "";
+      for (const seg of splitSpeedSegments(pts, flags)) {
+        const col = seg.wrong ? "var(--bad)" : "var(--accent)";
+        if (seg.pts.length === 1) {
+          strokes += `<circle cx="${seg.pts[0][0].toFixed(1)}" cy="${seg.pts[0][1].toFixed(1)}" r="3.5" fill="${col}"/>`;
+        } else {
+          const d = smoothSpeedPath(seg.pts);
+          strokes += `<path d="${d}" fill="none" stroke="${col}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`;
+        }
+      }
+      shape = `<path d="${area}" fill="var(--accent-soft)"/>${strokes}`;
     }
     el.innerHTML = `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" class="speed-svg">${shape}</svg>`;
   }
 
-  function recordSpeed() {
+  function recordSpeed(wrong) {
     const now = Date.now();
     let v;
     if (!A.lastCharTime) {
@@ -353,7 +376,8 @@
     A.lastCharTime = now;
     v = Math.max(0, Math.min(v, 400));
     A.speeds.push(v);
-    if (A.speeds.length > 80) A.speeds.shift();
+    A.speedWrong.push(!!wrong);
+    if (A.speeds.length > 80) { A.speeds.shift(); A.speedWrong.shift(); }
     updateSpeedChart();
   }
 
@@ -368,11 +392,12 @@
       if (A.stats.combo > A.stats.bestCombo) A.stats.bestCombo = A.stats.combo;
       soundCorrect();
       if (c.typedLen === c.code.length) {
+        const hadErrs = c.errs > 0;
         c.done = true;
         c.errs = 0;
         if (c.el) { c.el.classList.remove("err"); delete c.el.dataset.errs; }
         A.stats.itemsDone++;
-        recordSpeed();
+        recordSpeed(hadErrs);
         nextChar();
         return;
       }
@@ -436,7 +461,7 @@
         if (p.el) p.el.classList.remove("done", "err");
         A.stats.itemsDone = Math.max(0, A.stats.itemsDone - 1);
         A.stats.combo = 0;
-        if (A.speeds.length) { A.speeds.pop(); updateSpeedChart(); }
+        if (A.speeds.length) { A.speeds.pop(); A.speedWrong.pop(); updateSpeedChart(); }
         A.curIdx = j;
         if (A.segmented && p.seg !== A.segIdx) { A.segIdx = p.seg; renderText(); }
         setCur(j);

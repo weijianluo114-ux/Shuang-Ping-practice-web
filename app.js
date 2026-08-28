@@ -229,7 +229,7 @@ function lsSet(key, value) {
 
 let schemeId = lsGet(LS_KEYS.scheme, "xiaohe");
 let currentScheme = SCHEMES.find(s => s.id === schemeId) || SCHEMES[0];
-let settings = Object.assign({ hint: true, sound: true, theme: "auto" }, lsGet(LS_KEYS.settings, {}));
+let settings = Object.assign({ hint: true, sound: true, theme: "auto", articleFont: "system", articleSegmented: true }, lsGet(LS_KEYS.settings, {}));
 let currentView = "keyboard";
 
 /* 练习引擎 */
@@ -457,6 +457,36 @@ function showKeyDetail(key) {
 }
 function flashKey(key) {
   const el = document.querySelector(`.key[data-key="${key.toLowerCase()}"]`);
+  if (!el) return;
+  el.classList.add("pressed");
+  setTimeout(() => el.classList.remove("pressed"), 180);
+}
+function renderArtKeyboard() {
+  const box = $("#art-keyboard");
+  if (!box) return;
+  const rows = [
+    ["q", "w", "e", "r", "t", "y", "u", "i", "o", "p"],
+    ["a", "s", "d", "f", "g", "h", "j", "k", "l", ";"],
+    ["z", "x", "c", "v", "b", "n", "m"]
+  ];
+  box.innerHTML = rows.map(row => {
+    return `<div class="kb-row">` + row.map(k => {
+      const disp = currentScheme.displayMap[k];
+      const labelHtml = disp ? disp.split("/").map(l => {
+        const isIni = ["zh", "ch", "sh"].includes(l);
+        return isIni ? `<span class="ini">${l}</span>` : `${l}`;
+      }).join("/") : "";
+      const special = k === ";" ? " special" : "";
+      return `<button class="key${special}" data-key="${k}"><span class="letter">${k.toUpperCase()}</span><span class="lab">${labelHtml}</span></button>`;
+    }).join("") + `</div>`;
+  }).join("");
+  bindArtKeyClicks();
+}
+function bindArtKeyClicks() {
+  $$("#art-keyboard .key").forEach(el => el.addEventListener("click", () => showKeyDetail(el.dataset.key)));
+}
+function flashArtKey(key) {
+  const el = document.querySelector(`#art-keyboard .key[data-key="${key.toLowerCase()}"]`);
   if (!el) return;
   el.classList.add("pressed");
   setTimeout(() => el.classList.remove("pressed"), 180);
@@ -788,18 +818,32 @@ function applyTheme(theme) {
   }
   document.documentElement.setAttribute("data-theme", resolved);
 }
+const ARTICLE_FONTS = {
+  system: `"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,sans-serif`,
+  SimSun: `SimSun,"宋体",serif`,
+  SimHei: `SimHei,"黑体",sans-serif`,
+  KaiTi: `KaiTi,"楷体",serif`,
+  FangSong: `FangSong,"仿宋",serif`,
+  "Microsoft YaHei": `"Microsoft YaHei","微软雅黑",sans-serif`
+};
+function applyArticleFont() {
+  document.documentElement.style.setProperty("--art-font", ARTICLE_FONTS[settings.articleFont] || ARTICLE_FONTS.system);
+}
 function openModal() {
   $("#set-hint").checked = !!settings.hint;
   $("#set-sound").checked = !!settings.sound;
   $("#set-theme").value = settings.theme;
+  $("#set-font").value = settings.articleFont || "system";
   $("#modal").hidden = false;
 }
 function closeModal() {
   settings.hint = $("#set-hint").checked;
   settings.sound = $("#set-sound").checked;
   settings.theme = $("#set-theme").value;
+  settings.articleFont = $("#set-font").value;
   lsSet(LS_KEYS.settings, settings);
   applyTheme(settings.theme);
+  applyArticleFont();
   $("#modal").hidden = true;
   if (window.ArticlePractice) ArticlePractice.onSettings();
 }
@@ -817,6 +861,7 @@ function bindEvents() {
     applySchemeColor();
     renderSchemePicker();
     renderKeyboard();
+    renderArtKeyboard();
     if (drill.active || drill.finished) startDrill(drill.kind);
     if (roundActive && !finished) resetPracticeToSetup();
     if (window.ArticlePractice) ArticlePractice.onSchemeChange();
@@ -892,7 +937,9 @@ function bindEvents() {
 
 /* ================= 启动 ================= */
 applyTheme(settings.theme);
+applyArticleFont();
 applySchemeColor();
 renderSchemePicker();
+renderArtKeyboard();
 setView("keyboard");
 bindEvents();

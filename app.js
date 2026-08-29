@@ -229,7 +229,7 @@ function lsSet(key, value) {
 
 let schemeId = lsGet(LS_KEYS.scheme, "xiaohe");
 let currentScheme = SCHEMES.find(s => s.id === schemeId) || SCHEMES[0];
-let settings = Object.assign({ hint: true, sound: true, theme: "auto", fontSize: "large", articleFont: "system", articleBold: false, articleSegmented: true }, lsGet(LS_KEYS.settings, {}));
+let settings = Object.assign({ hint: true, sound: true, theme: "auto", fontSize: "large", articleFont: "system", articleBold: false }, lsGet(LS_KEYS.settings, {}));
 let currentView = "keyboard";
 
 /* 练习引擎 */

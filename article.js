@@ -17,9 +17,6 @@
 
   const A = {
     session: null,       // { title, byline, groups:[[char...]], flat:[char...] }
-    segments: [],        // 逐段模式下的显示单元（每个单元是一组字）
-    segIdx: 0,           // 当前显示的第几段（逐段模式）
-    segmented: true,     // 是否逐段显示
     curIdx: -1,          // flat 中当前待打汉字下标
     total: 0,            // 待打汉字总数
     baseDone: 0,         // 恢复进度时，本次打开前已经完成的字数（只用于进度显示）
@@ -102,43 +99,13 @@
           const raw = aligned ? pys[i] : singlePy(ch);
           if (raw && raw !== ch) { py = raw; code = codeFor(raw); }
         }
-        return { ch, py, code, skip: !code, done: !code, typedLen: 0, errs: 0, wrongRun: 0, revealed: false, el: null, pyEl: null, g: 0, seg: 0 };
+        return { ch, py, code, skip: !code, done: !code, typedLen: 0, errs: 0, wrongRun: 0, revealed: false, el: null, pyEl: null, g: 0 };
       });
       if (items.some(x => !x.skip)) groups.push(items);
     }
     return groups;
   }
 
-  /* 把过长的段落按句子裁剪成显示单元（逐段模式用） */
-  function buildSegments(groups) {
-    const MAX = 60;
-    const segs = [];
-    for (const group of groups) {
-      if (!group.length) continue;
-      let cur = [];
-      for (let i = 0; i < group.length; i++) {
-        const c = group[i];
-        cur.push(c);
-        const hardEnd = /[。！？；!?;…]/.test(c.ch);
-        if (cur.length >= MAX && (hardEnd || i === group.length - 1)) {
-          segs.push(cur); cur = [];
-        } else if (cur.length >= MAX) {
-          let splitAt = -1;
-          for (let j = cur.length - 1; j >= Math.floor(MAX * 0.5); j--) {
-            if (/[，、：,]/.test(cur[j].ch)) { splitAt = j; break; }
-          }
-          if (splitAt >= 0) {
-            segs.push(cur.slice(0, splitAt + 1));
-            cur = cur.slice(splitAt + 1);
-          } else {
-            segs.push(cur); cur = [];
-          }
-        }
-      }
-      if (cur.length) segs.push(cur);
-    }
-    return segs;
-  }
 
   /* ---------- 建会话 ---------- */
   function buildSession(title, byline, paragraphs) {
@@ -150,15 +117,9 @@
 
     let gi = 0;
     groups.forEach(g => { g.forEach(c => { c.g = gi; }); gi++; });
-    const segments = buildSegments(groups);
-    segments.forEach((seg, si) => seg.forEach(c => { c.seg = si; }));
-
     const first = flat.findIndex(c => !c.skip);
     A.session = { title, byline, groups, flat };
-    A.segments = segments;
-    A.segmented = !!settings.articleSegmented;
     A.curIdx = first;
-    A.segIdx = flat[first].seg;
     A.total = total;
     A.baseDone = 0;
     A.sessionStartIdx = first;
@@ -170,7 +131,6 @@
     $("#article-area").hidden = false;
     $("#art-finish").hidden = true;
     $("#art-hint").checked = !!settings.hint;
-    $("#art-seg").checked = !!settings.articleSegmented;
     $("#art-font").value = settings.articleFont || "system";
     $("#art-bold").checked = !!settings.articleBold;
     if (typeof applyArticleFont === "function") applyArticleFont();
@@ -200,7 +160,6 @@
     A.baseDone = doneBefore;
     A.sessionStartIdx = j;
     A.curIdx = j;
-    A.segIdx = s.flat[j].seg;
     A.stats.itemsDone = 0;
     renderText();
     updateLive();
@@ -218,10 +177,8 @@
     const box = $("#art-text");
     if (!box) return;
     box.classList.toggle("nohint", !settings.hint);
-    const items = A.segmented ? (A.segments[A.segIdx] || []) : A.session.flat;
-    const html = A.segmented
-      ? `<p class="apara">` + items.map(cellHtml).join("") + `</p>`
-      : A.session.groups.map(g => `<p class="apara">` + g.map(cellHtml).join("") + `</p>`).join("");
+    const items = A.session.flat;
+    const html = A.session.groups.map(g => `<p class="apara">` + g.map(cellHtml).join("") + `</p>`).join("");
     box.innerHTML = html;
     A.session.flat.forEach(c => { c.el = null; c.pyEl = null; });
     box.querySelectorAll(".ac").forEach((el, ii) => {
@@ -241,20 +198,24 @@
     positionArtText();
   }
 
-  /* 固定两行窗口：把当前字所在行贴到窗口顶部，下一行自然露在下面预览 */
+  /* 固定两行窗口：把当前字所在行滚动到窗口中间，整段可滑动 */
   let scrollAnimId = 0;
   function smoothScrollTo(box, y) {
     const id = ++scrollAnimId;
-    if (Math.abs(y - box.scrollTop) < 0.5) return;
-    let steps = 0;
-    function step() {
+    const start = box.scrollTop;
+    const dist = y - start;
+    if (Math.abs(dist) < 0.5) return;
+    const dur = Math.min(260, Math.max(140, Math.abs(dist) * 0.45));
+    let t0 = null;
+    function step(now) {
       if (id !== scrollAnimId) return;
-      const remaining = y - box.scrollTop;
-      if (Math.abs(remaining) < 0.5 || steps++ > 40) { box.scrollTop = y; return; }
-      box.scrollTop += remaining * 0.22;
-      setTimeout(step, 16);
+      if (t0 === null) t0 = now;
+      const t = Math.min(1, (now - t0) / dur);
+      const eased = 1 - Math.pow(1 - t, 3); // easeOutCubic
+      box.scrollTop = start + dist * eased;
+      if (t < 1) requestAnimationFrame(step);
     }
-    setTimeout(step, 16);
+    requestAnimationFrame(step);
   }
   function positionArtText() {
     const box = $("#art-text");
@@ -263,11 +224,15 @@
     const boxRect = box.getBoundingClientRect();
     const elRect = c.el.getBoundingClientRect();
     if (!boxRect.height) return;
-    const padTop = parseFloat(getComputedStyle(box).paddingTop) || 0;
+    const cs = getComputedStyle(box);
+    const padTop = parseFloat(cs.paddingTop) || 0;
+    const padBottom = parseFloat(cs.paddingBottom) || 0;
+    const contentCenter = padTop + (box.clientHeight - padTop - padBottom) / 2;
     const lineTop = elRect.top - boxRect.top + box.scrollTop; // 换算成内容坐标
-    const targetY = Math.max(0, lineTop - padTop);
+    const lineH = elRect.height || (parseFloat(getComputedStyle(c.el).lineHeight) || 0);
+    const targetY = lineTop + lineH / 2 - contentCenter;
     const maxY = Math.max(0, box.scrollHeight - box.clientHeight);
-    const y = Math.min(targetY, maxY);
+    const y = Math.min(Math.max(0, targetY), maxY);
     smoothScrollTo(box, y);
   }
 
@@ -344,21 +309,14 @@
 
   function updateLive() {
     if (!A.session) return;
-    let done, total;
-    if (A.segmented) {
-      const seg = A.segments[A.segIdx] || [];
-      total = seg.filter(c => !c.skip).length;
-      done = countDone(seg);
-    } else {
-      total = A.total;
-      done = countDone(A.session.flat);
-    }
+    const total = A.total;
+    const done = countDone(A.session.flat);
     const ks = A.stats.correct + A.stats.wrong;
     const acc = ks ? Math.round(A.stats.correct / ks * 100) : 100;
     const elapsed = artElapsed();
     const speed = Math.round(A.stats.itemsDone / Math.max(elapsed / 60000, 0.01));
     const accClass = acc >= 95 ? "ok" : (acc >= 85 ? "" : "bad");
-    const segInfo = A.segmented ? `<span class="chip">${A.segIdx + 1}/${A.segments.length} 段</span>` : `<span class="chip">全文</span>`;
+    const segInfo = `<span class="chip">全文</span>`;
     const goodChip = A.goodMode && A.good ? `<span class="chip">💎 已练 <b>${A.good.total}</b> 句</span>` : "";
     $("#art-live").innerHTML = `
       ${goodChip}
@@ -511,10 +469,6 @@
       return;
     }
     A.curIdx = j;
-    if (A.segmented) {
-      const nextSeg = s.flat[j].seg;
-      if (nextSeg !== A.segIdx) { A.segIdx = nextSeg; renderText(); }
-    }
     setCur(j);
     saveProgress();
     updateLive();
@@ -550,7 +504,6 @@
         A.stats.combo = 0;
         if (A.speeds.length) { A.speeds.pop(); A.speedWrong.pop(); updateSpeedChart(); }
         A.curIdx = j;
-        if (A.segmented && p.seg !== A.segIdx) { A.segIdx = p.seg; renderText(); }
         setCur(j);
         saveProgress();
         updateLive();
@@ -601,7 +554,6 @@
     A.goodPrefetching = false;
     pauseArtTimer();
     A.session = null;
-    A.segments = [];
     $("#article-area").hidden = true;
     $("#art-finish").hidden = true;
     $("#article-setup").hidden = false;
@@ -892,8 +844,6 @@
   function onSettings() {
     const hintEl = $("#art-hint");
     if (hintEl) hintEl.checked = !!settings.hint;
-    const segEl = $("#art-seg");
-    if (segEl) segEl.checked = !!settings.articleSegmented;
     const fontEl = $("#art-font");
     if (fontEl) fontEl.value = settings.articleFont || "system";
     const boldEl = $("#art-bold");
@@ -927,16 +877,6 @@
     settings.hint = e.target.checked;
     lsSet(LS_KEYS.settings, settings);
     refreshHints();
-  });
-  $("#art-seg").addEventListener("change", e => {
-    settings.articleSegmented = e.target.checked;
-    lsSet(LS_KEYS.settings, settings);
-    if (A.session) {
-      A.segmented = settings.articleSegmented;
-      if (A.segmented) A.segIdx = A.session.flat[A.curIdx].seg;
-      renderText();
-      updateLive();
-    }
   });
   $("#art-font").addEventListener("change", e => {
     settings.articleFont = e.target.value;

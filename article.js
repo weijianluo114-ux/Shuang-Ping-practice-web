@@ -33,9 +33,12 @@
     goodMode: false,     // 是否处于“好词好句”无限练模式
     goodLoading: false,  // 正在联网取下一批句子
     good: null,          // { total, timeMs, days:{}, progress:{pool,idx,ts} }
-    goodNextPool: null,  // 提前预加载好的下一批句子（字符串数组）
     goodPrefetching: false,
     goodBatchGen: 0,     // 批次代号，用于作废过期预加载
+    goodWinStart: 0,     // 当前 DOM 窗口第一句在 good.pool 中的下标
+    goodRemovedChars: 0, // 已从窗口头部删除的字符总数（用于把窗口内 curIdx 换算成绝对下标）
+    goodDoneBase: 0,     // 已从窗口删除的已完成字数（用于进度条累计）
+    instantScroll: false,// 好词好句滑动窗口时跳过滚动动画，直接定位
     autoStarted: false,  // 是否已做过启动自动开文
     speeds: [],          // 每字瞬时速度采样（字/分）
     lastCharTime: 0,
@@ -233,7 +236,12 @@
     const targetY = lineTop + lineH / 2 - contentCenter;
     const maxY = Math.max(0, box.scrollHeight - box.clientHeight);
     const y = Math.min(Math.max(0, targetY), maxY);
-    smoothScrollTo(box, y);
+    if (A.instantScroll) {
+      box.scrollTop = y;          // 滑动窗口时直接定位，避免回溯/滚动动画
+      A.instantScroll = false;
+    } else {
+      smoothScrollTo(box, y);
+    }
   }
 
   function renderCurSlots() {
@@ -309,8 +317,13 @@
 
   function updateLive() {
     if (!A.session) return;
-    const total = A.total;
-    const done = countDone(A.session.flat);
+    let total = A.total;
+    let done = countDone(A.session.flat);
+    if (A.goodMode) {
+      // 好词好句：删除旧句后进度不回退，把已删除的已完成字数累计进来
+      done = (A.goodDoneBase || 0) + done;
+      total = (A.goodDoneBase || 0) + A.total;
+    }
     const ks = A.stats.correct + A.stats.wrong;
     const acc = ks ? Math.round(A.stats.correct / ks * 100) : 100;
     const elapsed = artElapsed();
@@ -458,13 +471,35 @@
       cur.el.classList.add("done");
       if (cur.pyEl && settings.hint) cur.pyEl.textContent = cur.py || "";
     }
+    if (A.goodMode) {
+      let j = A.curIdx + 1;
+      while (j < s.flat.length && s.flat[j].skip) j++;
+      let batchDone = j >= s.flat.length;
+      if (cur && (batchDone || s.flat[j].g > cur.g)) goodRecordSentence(cur.g);
+      if (batchDone) {
+        goodAppendFallbackSync(); // 若预加载未及时续上，先同步补齐，保证不断流
+        j = A.curIdx + 1;
+        while (j < s.flat.length && s.flat[j].skip) j++;
+        batchDone = j >= s.flat.length;
+      }
+      if (batchDone || countDone(s.flat) >= A.total) {
+        A.curIdx = -1;
+        finish();
+        return;
+      }
+      j = goodSlideWindow(j);     // 删除太旧的句子，窗口整体下移
+      A.curIdx = j;
+      A.instantScroll = true;     // 本次定位直接跳转，不播放滚动动画
+      setCur(j);
+      saveProgress();
+      updateLive();
+      return;
+    }
     let j = A.curIdx + 1;
     while (j < s.flat.length && s.flat[j].skip) j++;
     const batchDone = j >= s.flat.length;
-    if (A.goodMode && cur && (batchDone || s.flat[j].g > cur.g)) goodRecordSentence(cur.g);
     if (batchDone || countDone(s.flat) >= A.total) {
       A.curIdx = -1;
-      if (A.goodMode) { goodNextBatch(); return; }
       finish();
       return;
     }
@@ -550,8 +585,10 @@
     }
     A.active = false; A.finished = false; A.started = false;
     A.goodMode = false;
-    A.goodNextPool = null;
     A.goodPrefetching = false;
+    A.goodWinStart = 0;
+    A.goodRemovedChars = 0;
+    A.goodDoneBase = 0;
     pauseArtTimer();
     A.session = null;
     $("#article-area").hidden = true;
@@ -565,7 +602,7 @@
     if (!A.session || A.finished) return;
     if (A.goodMode) {
       const g = goodLoad();
-      g.progress = { pool: (g.pool || []).slice(), idx: A.curIdx, ts: Date.now() };
+      g.progress = { pool: (g.pool || []).slice(), idx: A.goodRemovedChars + A.curIdx, ts: Date.now() };
       goodSave();
       return;
     }
@@ -599,7 +636,8 @@
   function goodRecordSentence(g) {
     goodLoad().total += 1;
     goodSave();
-    if (g >= 6) goodPrefetch();
+    const poolLen = A.good.pool ? A.good.pool.length : 0;
+    if (poolLen && g >= poolLen - 4) goodPrefetch();
   }
   function fmtGoodTime(ms) {
     const totalMin = Math.floor((ms || 0) / 60000);
@@ -613,14 +651,102 @@
     const resume = g.progress && Array.isArray(g.progress.pool) && g.progress.pool.length ? " · 可续练" : "";
     return `<button class="art-card good" id="btn-art-good"><strong>💎 好词好句（联网无限练）${resume ? `<span class="badge">续练</span>` : ""}</strong><span class="meta">已练 ${g.total || 0} 句 · 时长 ${fmtGoodTime(g.timeMs || 0)} · 坚持 ${days} 天</span></button>`;
   }
+  /* ---------- 好词好句滑动窗口维护 ---------- */
+  function goodAppendSentences(list, extendPool) {
+    const s = A.session;
+    const box = $("#art-text");
+    if (!s || !box || !A.goodMode || !list || !list.length) return 0;
+    const texts = list.map(x => (typeof x === "string" ? x : x.t));
+    const groups = tokenizeParagraphs(texts);
+    if (!groups.length) return 0;
+    const startG = A.goodWinStart + s.groups.length;
+    const oldLen = s.flat.length;
+    let newNonSkip = 0;
+    const html = groups.map((g, gi) => {
+      g.forEach(c => { c.g = startG + gi; if (!c.skip) newNonSkip++; });
+      return `<p class="apara">` + g.map(cellHtml).join("") + `</p>`;
+    }).join("");
+    box.insertAdjacentHTML("beforeend", html);
+    const acs = box.querySelectorAll(".ac");
+    const flatAdd = [].concat(...groups);
+    flatAdd.forEach((c, k) => {
+      s.flat.push(c);
+      const el = acs[oldLen + k];
+      if (el) { c.el = el; c.pyEl = el.querySelector(".py"); }
+    });
+    groups.forEach(g => s.groups.push(g));
+    A.total += newNonSkip;
+    if (extendPool !== false) A.good.pool = A.good.pool.concat(texts);
+    updateLive();
+    return texts.length;
+  }
+
+  function goodRemoveOldBefore(newG) {
+    const s = A.session;
+    const box = $("#art-text");
+    if (!s || !box) return 0;
+    const keepG = newG - 2; // 保留当前句及前两句，删除更早的句子
+    const paras = box.querySelectorAll(".apara");
+    let removeCount = 0;
+    for (let i = 0; i < s.groups.length; i++) {
+      const first = s.groups[i][0];
+      if (first && first.g < keepG) removeCount++;
+      else break;
+    }
+    if (removeCount <= 0) return 0;
+    let removedChars = 0, removedDone = 0;
+    for (let i = 0; i < removeCount; i++) {
+      const g = s.groups[i];
+      removedChars += g.length;
+      removedDone += g.filter(c => !c.skip && c.done).length;
+      if (paras[i]) paras[i].remove();
+    }
+    s.flat.splice(0, removedChars);
+    s.groups.splice(0, removeCount);
+    A.goodWinStart += removeCount;
+    A.goodRemovedChars += removedChars;
+    A.goodDoneBase += removedDone;
+    A.total = Math.max(0, A.total - removedDone);
+    A.sessionStartIdx = Math.max(0, A.sessionStartIdx - removedChars);
+    return removedChars;
+  }
+
+  function goodSlideWindow(j) {
+    const s = A.session;
+    if (!s || !A.goodMode) return j;
+    const c = s.flat[j];
+    if (!c) return j;
+    return j - goodRemoveOldBefore(c.g);
+  }
+
+  function goodAppendFallbackSync() {
+    const s = A.session;
+    if (!s || !A.goodMode) return false;
+    const windowEnd = A.goodWinStart + s.groups.length;
+    if (A.good.pool.length > windowEnd) {
+      goodAppendSentences(A.good.pool.slice(windowEnd), false);
+      updateLive();
+      return true;
+    }
+    const fb = shuffle((window.SP_ARTICLES || {}).sentences || []).slice(0, 10);
+    if (fb.length) {
+      goodAppendSentences(fb);
+      goodSave();
+      return true;
+    }
+    return false;
+  }
+
   async function goodPrefetch() {
-    if (A.goodPrefetching || A.goodNextPool || !A.goodMode) return;
+    if (A.goodPrefetching || !A.goodMode || !A.good.pool) return;
     A.goodPrefetching = true;
     const gen = A.goodBatchGen;
+    const startLen = A.good.pool.length;
     let list = [];
     try { list = await fetchSentences(10); } catch (e) { console.warn("[好词好句] 预加载失败", e); }
-    if (A.goodMode && gen === A.goodBatchGen && !A.goodNextPool && list.length >= 3) {
-      A.goodNextPool = list.map(s => s.t);
+    if (A.goodMode && gen === A.goodBatchGen && A.good.pool.length === startLen && list.length >= 3) {
+      goodAppendSentences(list);
+      goodSave();
     }
     A.goodPrefetching = false;
   }
@@ -631,13 +757,9 @@
     A.curIdx = -1;
     $("#art-live").innerHTML = `<span class="chip">💎 已练 <b>${goodLoad().total}</b> 句</span><span class="chip">正在加载下一批…</span>`;
     goodFlushTime();
-    let list = A.goodNextPool || null;
-    A.goodNextPool = null;
-    A.goodPrefetching = false;
-    if (!list || list.length < 3) {
-      try { list = await fetchSentences(10); } catch (e) { console.warn("[好词好句] 联网获取失败", e); }
-      if (!A.goodMode) { A.goodLoading = false; return; } // 加载期间用户已退出
-    }
+    let list = [];
+    try { list = await fetchSentences(10); } catch (e) { console.warn("[好词好句] 联网获取失败", e); }
+    if (!A.goodMode) { A.goodLoading = false; return; } // 加载期间用户已退出
     if (list.length < 3) {
       const fb = shuffle((window.SP_ARTICLES || {}).sentences || []).slice(0, 10);
       list = fb.map(s => (typeof s === "string" ? { t: s } : s));
@@ -650,6 +772,9 @@
     }
     A.good.pool = list.map(s => (typeof s === "string" ? s : s.t));
     A.good.progress = null;
+    A.goodWinStart = 0;
+    A.goodRemovedChars = 0;
+    A.goodDoneBase = 0;
     A.lastSource = { title: "好词好句", byline: "一言 hitokoto · 无限续练", paragraphs: A.good.pool };
     A.articleId = null; A.lastSourceId = null;
     buildSession(A.lastSource.title, A.lastSource.byline, A.lastSource.paragraphs);
@@ -662,8 +787,10 @@
     A.good.days[todayStr()] = 1;
     goodSave();
     A.goodMode = true;
-    A.goodNextPool = null;
     A.goodPrefetching = false;
+    A.goodWinStart = 0;
+    A.goodRemovedChars = 0;
+    A.goodDoneBase = 0;
     A.articleId = null; A.lastSourceId = null;
     const saved = A.good.progress;
     if (saved && Array.isArray(saved.pool) && saved.pool.length && typeof saved.idx === "number") {
@@ -672,8 +799,14 @@
       A.lastSource = { title: "好词好句", byline: "一言 hitokoto · 续练", paragraphs: A.good.pool };
       if (buildSession(A.lastSource.title, A.lastSource.byline, A.lastSource.paragraphs)) {
         applyResume(saved.idx);
+        // 续练时也先删除过旧的句子，避免框里堆太多
+        const j = goodSlideWindow(A.curIdx);
+        A.curIdx = j;
+        A.instantScroll = true;
+        setCur(j);
+        updateLive();
         const c = A.session && A.session.flat ? A.session.flat[A.curIdx] : null;
-        if (c && c.g >= 6) goodPrefetch();
+        if (c && c.g >= (A.good.pool.length - 4)) goodPrefetch();
       }
       return;
     }

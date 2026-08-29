@@ -13,7 +13,7 @@
   }
 
   const HAN = /[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]/;
-  const A_LS = { progress: "sp_article_progress_v1", done: "sp_article_done_v1" };
+  const A_LS = { progress: "sp_article_progress_v1", done: "sp_article_done_v1", good: "sp_good_v1" };
 
   const A = {
     session: null,       // { title, byline, groups:[[char...]], flat:[char...] }
@@ -33,6 +33,9 @@
     articleId: null,     // 当前会话对应的内置文章 id（用于进度与已练记录）
     listRendered: false,
     busy: false,
+    goodMode: false,     // 是否处于“好词好句”无限练模式
+    goodLoading: false,  // 正在联网取下一批句子
+    good: null,          // { total, timeMs, days:{}, progress:{pool,idx,ts} }
     autoStarted: false,  // 是否已做过启动自动开文
     speeds: [],          // 每字瞬时速度采样（字/分）
     lastCharTime: 0,
@@ -285,7 +288,9 @@
     const speed = Math.round(A.stats.itemsDone / Math.max(elapsed / 60000, 0.01));
     const accClass = acc >= 95 ? "ok" : (acc >= 85 ? "" : "bad");
     const segInfo = A.segmented ? `<span class="chip">${A.segIdx + 1}/${A.segments.length} 段</span>` : `<span class="chip">全文</span>`;
+    const goodChip = A.goodMode && A.good ? `<span class="chip">💎 已练 <b>${A.good.total}</b> 句</span>` : "";
     $("#art-live").innerHTML = `
+      ${goodChip}
       ${segInfo}
       <span class="chip">完成 <b>${done}</b>/${total}</span>
       <span class="chip">⏱ <b>${fmtTime(elapsed)}</b></span>
@@ -421,10 +426,16 @@
       cur.el.classList.add("done");
       if (cur.pyEl && settings.hint) cur.pyEl.textContent = cur.py || "";
     }
-    if (countDone(s.flat) >= A.total) { A.curIdx = -1; finish(); return; }
     let j = A.curIdx + 1;
     while (j < s.flat.length && s.flat[j].skip) j++;
-    if (j >= s.flat.length) { finish(); return; }
+    const batchDone = j >= s.flat.length;
+    if (A.goodMode && cur && (batchDone || s.flat[j].g > cur.g)) goodRecordSentence();
+    if (batchDone || countDone(s.flat) >= A.total) {
+      A.curIdx = -1;
+      if (A.goodMode) { goodNextBatch(); return; }
+      finish();
+      return;
+    }
     A.curIdx = j;
     if (A.segmented) {
       const nextSeg = s.flat[j].seg;
@@ -504,8 +515,12 @@
   }
 
   function exitToList() {
-    if (A.active && !A.finished) saveProgress();
+    if (A.active && !A.finished) {
+      goodFlushTime();
+      saveProgress();
+    }
     A.active = false; A.finished = false; A.started = false;
+    A.goodMode = false;
     pauseArtTimer();
     A.session = null;
     A.segments = [];
@@ -517,7 +532,14 @@
 
   /* ---------- 进度与已练记录 ---------- */
   function saveProgress() {
-    if (!A.articleId || !A.session || A.finished) return;
+    if (!A.session || A.finished) return;
+    if (A.goodMode) {
+      const g = goodLoad();
+      g.progress = { pool: (g.pool || []).slice(), idx: A.curIdx, ts: Date.now() };
+      goodSave();
+      return;
+    }
+    if (!A.articleId) return;
     lsSet(A_LS.progress, { id: A.articleId, idx: A.curIdx, ts: Date.now() });
   }
   function markDone(id) {
@@ -528,6 +550,80 @@
   function findArticle(id) {
     const pool = window.SP_ARTICLES || {};
     return ((pool.classics || []).concat(pool.originals || [])).find(x => x.id === id) || null;
+  }
+
+  /* ---------- 好词好句（联网无限练） ---------- */
+  function goodLoad() {
+    if (!A.good) A.good = lsGet(A_LS.good, { total: 0, timeMs: 0, days: {}, progress: null });
+    A.good.days = A.good.days || {};
+    return A.good;
+  }
+  function goodSave() {
+    if (A.good) lsSet(A_LS.good, A.good);
+  }
+  function goodFlushTime() {
+    if (A.goodMode && A.active && !A.finished) {
+      goodLoad().timeMs += artElapsed();
+    }
+  }
+  function goodRecordSentence() {
+    goodLoad().total += 1;
+    goodSave();
+  }
+  function fmtGoodTime(ms) {
+    const totalMin = Math.floor((ms || 0) / 60000);
+    const h = Math.floor(totalMin / 60);
+    const m = totalMin % 60;
+    return h > 0 ? `${h}小时${m}分` : `${m}分`;
+  }
+  function goodCardHtml() {
+    const g = lsGet(A_LS.good, { total: 0, timeMs: 0, days: {} });
+    const days = Object.keys(g.days || {}).length;
+    const resume = g.progress && Array.isArray(g.progress.pool) && g.progress.pool.length ? " · 可续练" : "";
+    return `<button class="art-card good" id="btn-art-good"><strong>💎 好词好句（联网无限练）${resume ? `<span class="badge">续练</span>` : ""}</strong><span class="meta">已练 ${g.total || 0} 句 · 时长 ${fmtGoodTime(g.timeMs || 0)} · 坚持 ${days} 天</span></button>`;
+  }
+  async function goodNextBatch() {
+    if (A.goodLoading || !A.goodMode) return;
+    A.goodLoading = true;
+    A.curIdx = -1;
+    $("#art-live").innerHTML = `<span class="chip">💎 已练 <b>${goodLoad().total}</b> 句</span><span class="chip">正在加载下一批…</span>`;
+    goodFlushTime();
+    let list = [];
+    try { list = await fetchSentences(10); } catch (e) { console.warn("[好词好句] 联网获取失败", e); }
+    if (!A.goodMode) { A.goodLoading = false; return; } // 加载期间用户已退出
+    if (list.length < 3) {
+      const fb = shuffle((window.SP_ARTICLES || {}).sentences || []).slice(0, 10);
+      list = fb.map(s => (typeof s === "string" ? { t: s } : s));
+    }
+    if (!list.length) {
+      A.goodLoading = false;
+      toast("暂时没有可用句子，请稍后再试");
+      updateLive();
+      return;
+    }
+    A.good.pool = list.map(s => s.t);
+    A.good.progress = null;
+    A.lastSource = { title: "好词好句", byline: "一言 hitokoto · 无限续练", paragraphs: A.good.pool };
+    A.articleId = null; A.lastSourceId = null;
+    buildSession(A.lastSource.title, A.lastSource.byline, A.lastSource.paragraphs);
+    goodSave();
+    A.goodLoading = false;
+  }
+  function startGood() {
+    if (A.busy || A.goodLoading) return;
+    goodLoad();
+    A.good.days[todayStr()] = 1;
+    goodSave();
+    A.goodMode = true;
+    A.articleId = null; A.lastSourceId = null;
+    const saved = A.good.progress;
+    if (saved && Array.isArray(saved.pool) && saved.pool.length && typeof saved.idx === "number") {
+      A.good.pool = saved.pool;
+      A.lastSource = { title: "好词好句", byline: "一言 hitokoto · 续练", paragraphs: A.good.pool };
+      if (buildSession(A.lastSource.title, A.lastSource.byline, A.lastSource.paragraphs)) applyResume(saved.idx);
+      return;
+    }
+    goodNextBatch();
   }
 
   /* ---------- 文章列表 ---------- */
@@ -558,6 +654,8 @@
       <div class="art-grid">${classics.map(a => artCardHtml(a, doneMap)).join("")}</div>
       <div class="art-sec">✍️ 随手短文</div>
       <div class="art-grid">${originals.map(a => artCardHtml(a, doneMap)).join("")}</div>
+      <div class="art-sec">💎 好词好句 · 联网无限练</div>
+      <div class="art-grid">${goodCardHtml()}</div>
       <div class="art-sec">🌿 美文句子 · 一段十句</div>
       <div class="art-grid">${catChips}<button class="art-card online" id="btn-art-online"><strong>🌐 联网获取十句</strong><span class="meta">需要网络 · 一言 API</span></button></div>`;
   }
@@ -643,6 +741,7 @@
   function restartLast() {
     const src = A.lastSource;
     if (!src || !src.paragraphs || !src.paragraphs.length) return;
+    goodFlushTime();
     A.articleId = A.lastSourceId || null;
     buildSession(src.title, src.byline, src.paragraphs);
     saveProgress();
@@ -705,6 +804,7 @@
   $("#article-list").addEventListener("click", e => {
     const card = e.target.closest(".art-card");
     if (!card || card.disabled) return;
+    if (card.id === "btn-art-good") { startGood(); return; }
     if (card.id === "btn-art-online") { startOnline(); return; }
     if (card.dataset.art) {
       const pool = window.SP_ARTICLES || { classics: [], originals: [], sentences: [] };
@@ -745,6 +845,13 @@
     settings.articleBold = e.target.checked;
     lsSet(LS_KEYS.settings, settings);
     if (typeof applyArticleFont === "function") applyArticleFont();
+  });
+
+  window.addEventListener("beforeunload", () => {
+    if (A.goodMode && A.active && !A.finished) {
+      goodFlushTime();
+      goodSave();
+    }
   });
 
   window.ArticlePractice = { onView, onKey, onEscape, onSchemeChange, onSettings, renderList };

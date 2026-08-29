@@ -27,6 +27,7 @@
   <button class="tab" data-view="practice">综合练习</button>
   <button class="tab" data-view="article">文章</button>
   <button class="tab" data-view="stats">我的统计</button>
+  <button class="tab donate-tab" id="btn-donate" title="Buy Me a Coffee">☕ Buy Me a<br>Coffee</button>
 </nav>
 
 <main>
@@ -285,6 +286,26 @@
     </div>
     <div class="modal-actions">
       <button class="btn primary" id="btn-modal-close">完成</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="donate-modal" hidden>
+  <div class="modal donate-modal">
+    <h2>☕ Buy Me a Coffee</h2>
+    <p class="donate-desc">这对我继续求学有很大的帮助，攒学费ing，谢谢你们</p>
+    <div class="donate-grid">
+      <figure>
+        <img src="assets/微信收款码.png" alt="微信收款码">
+        <figcaption>微信</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/支付宝收款码.jpg" alt="支付宝收款码">
+        <figcaption>支付宝</figcaption>
+      </figure>
+    </div>
+    <div class="modal-actions">
+      <button class="btn primary" id="btn-donate-close">谢谢，关闭</button>
     </div>
   </div>
 </div>

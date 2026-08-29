@@ -908,7 +908,7 @@ function bindEvents() {
     if (window.ArticlePractice) ArticlePractice.onSchemeChange();
   });
   /* 顶部导航 */
-  $$(".tab").forEach(t => t.addEventListener("click", () => setView(t.dataset.view)));
+  $$(".tab").forEach(t => t.addEventListener("click", () => { if (t.dataset.view) setView(t.dataset.view); }));
   /* 键位记忆 */
   $("#drill-modes").addEventListener("click", e => {
     const btn = e.target.closest("button[data-drill]");
@@ -940,6 +940,10 @@ function bindEvents() {
   $("#btn-settings").addEventListener("click", openModal);
   $("#btn-modal-close").addEventListener("click", closeModal);
   $("#modal").addEventListener("click", e => { if (e.target.id === "modal") closeModal(); });
+  /* 赞赏弹窗 */
+  $("#btn-donate").addEventListener("click", () => { $("#donate-modal").hidden = false; });
+  $("#btn-donate-close").addEventListener("click", () => { $("#donate-modal").hidden = true; });
+  $("#donate-modal").addEventListener("click", e => { if (e.target.id === "donate-modal") $("#donate-modal").hidden = true; });
   $("#btn-clear-data").addEventListener("click", () => {
     if (confirm("确定清除全部练习统计吗？")) {
       lsSet(LS_KEYS.stats, null);
@@ -951,6 +955,7 @@ function bindEvents() {
     if (e.ctrlKey && (e.key === "I" || e.key === "i")) { e.preventDefault(); openModal(); return; }
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     if (!$("#modal").hidden) return;
+    if (!$("#donate-modal").hidden) { if (e.key === "Escape") $("#donate-modal").hidden = true; return; }
     const tag = e.target && e.target.tagName;
     if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
     if (e.key === "Escape") {

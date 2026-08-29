@@ -54,6 +54,15 @@
 所有数据只存在浏览器 `localStorage` 里，不联网、不上传。设置里可关提示 / 关音效 /
 切深色主题 / 清除记录。
 
+## ☕ Buy Me a Coffee
+
+这对我继续求学有很大的帮助，攒学费ing，谢谢你们
+
+<div align="center">
+  <img src="assets/微信收款码.png" width="200" alt="微信收款码" />
+  <img src="assets/支付宝收款码.jpg" width="200" alt="支付宝收款码" />
+</div>
+
 ## 练习小贴士
 
 1. 先把输入法切换成与网站一致的方案（网站右上角可切换）。

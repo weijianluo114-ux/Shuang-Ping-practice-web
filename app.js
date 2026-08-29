@@ -213,7 +213,7 @@ function lineToRecord(line) {
 const WORDS = WORD_LINES.map(lineToRecord);
 const SENTENCES = SENTENCE_LINES.map(lineToRecord);
 /* ================= 状态与存储 ================= */
-const LS_KEYS = { scheme: "sp_scheme_v1", settings: "sp_settings_v1", stats: "sp_stats_v1", custom: "sp_custom_v1", view: "sp_view_v1" };
+const LS_KEYS = { scheme: "sp_scheme_v1", settings: "sp_settings_v1", stats: "sp_stats_v1", custom: "sp_custom_v1", view: "sp_view_v1", articleDaily: "sp_article_daily_v1" };
 
 function lsGet(key, fallback) {
   try {
@@ -770,6 +770,114 @@ function mergeRoundIntoStats(rs, elapsedMs) {
   st.days[day].timeMs += elapsedMs;
   lsSet(LS_KEYS.stats, st);
 }
+/* 按日记录文章练习平均速度（article.js 调用） */
+function recordArticleDaily(itemsDone, timeMs) {
+  if (!itemsDone || itemsDone <= 0 || !timeMs || timeMs <= 0) return;
+  const data = lsGet(LS_KEYS.articleDaily, {});
+  const day = todayStr();
+  if (!data[day]) data[day] = { items: 0, timeMs: 0 };
+  data[day].items += itemsDone;
+  data[day].timeMs += timeMs;
+  lsSet(LS_KEYS.articleDaily, data);
+}
+function dateKeyOf(d) {
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+}
+function smoothPath(pts) {
+  if (!pts || !pts.length) return "";
+  if (pts.length === 1) return `M ${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}`;
+  let d = `M ${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}`;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[Math.max(i - 1, 0)];
+    const p1 = pts[i];
+    const p2 = pts[i + 1];
+    const p3 = pts[Math.min(i + 2, pts.length - 1)];
+    const c1x = p1[0] + (p2[0] - p0[0]) / 6;
+    const c1y = p1[1] + (p2[1] - p0[1]) / 6;
+    const c2x = p2[0] - (p3[0] - p1[0]) / 6;
+    const c2y = p2[1] - (p3[1] - p1[1]) / 6;
+    d += ` C ${c1x.toFixed(1)},${c1y.toFixed(1)} ${c2x.toFixed(1)},${c2y.toFixed(1)} ${p2[0].toFixed(1)},${p2[1].toFixed(1)}`;
+  }
+  return d;
+}
+let speedTrendRange = "30";
+function renderSpeedTrend() {
+  const el = document.getElementById("stats-speed");
+  if (!el) return;
+  const ranges = [
+    { id: "7", label: "7天" },
+    { id: "30", label: "30天" },
+    { id: "90", label: "3个月" },
+    { id: "180", label: "6个月" },
+    { id: "0", label: "全部" },
+  ];
+  const tabs = ranges.map(r => `<button class="st-tab${speedTrendRange === r.id ? " active" : ""}" data-range="${r.id}">${r.label}</button>`).join("");
+  const data = lsGet(LS_KEYS.articleDaily, {});
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const days = [];
+  if (speedTrendRange === "0") {
+    const keys = Object.keys(data).sort();
+    if (!keys.length) {
+      el.innerHTML = `<h3>文章打字速度趋势</h3><div class="st-tabs">${tabs}</div><div class="empty">还没有文章练习记录，去文章页练一段吧。</div>`;
+      return;
+    }
+    const first = new Date(keys[0] + "T00:00:00");
+    const n = Math.max(1, Math.round((today - first) / 86400000) + 1);
+    for (let i = 0; i < n; i++) days.push(dateKeyOf(new Date(first.getTime() + i * 86400000)));
+  } else {
+    const n = parseInt(speedTrendRange, 10) || 30;
+    for (let i = n - 1; i >= 0; i--) days.push(dateKeyOf(new Date(today.getTime() - i * 86400000)));
+  }
+  const pts = [];
+  days.forEach((key, i) => {
+    const rec = data[key];
+    if (rec && rec.timeMs > 0) {
+      pts.push({ i, key, speed: Math.round(rec.items / Math.max(rec.timeMs / 60000, 0.01)) });
+    }
+  });
+  if (!pts.length) {
+    el.innerHTML = `<h3>文章打字速度趋势</h3><div class="st-tabs">${tabs}</div><div class="empty">该时间范围内还没有文章练习记录。</div>`;
+    return;
+  }
+  const avg = Math.round(pts.reduce((sum, p) => sum + p.speed, 0) / pts.length);
+  const W = 720, H = 230, padL = 38, padR = 14, padT = 14, padB = 30;
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+  const max = Math.min(Math.max.apply(null, pts.map(p => p.speed).concat([60])), 200);
+  const span = Math.max(1, days.length - 1);
+  const xy = pts.map(p => {
+    const x = pts.length === 1 ? padL + plotW / 2 : padL + (p.i / span) * plotW;
+    const y = padT + plotH - Math.min(p.speed / max, 1) * plotH;
+    return [x, y];
+  });
+  const line = smoothPath(xy);
+  const baseY = padT + plotH;
+  const area = `${line} L ${xy[xy.length - 1][0].toFixed(1)},${baseY.toFixed(1)} L ${xy[0][0].toFixed(1)},${baseY.toFixed(1)} Z`;
+  const dots = xy.map(([x, y], i) => `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3"><title>${pts[i].key} · ${pts[i].speed} 字/分</title></circle>`).join("");
+  const grid = [0.25, 0.5, 0.75].map(f => {
+    const y = padT + plotH - f * plotH;
+    return `<line x1="${padL}" y1="${y.toFixed(1)}" x2="${W - padR}" y2="${y.toFixed(1)}" class="grid"><title>${Math.round(max * f)} 字/分</title></line>`;
+  }).join("");
+  el.innerHTML = `
+    <h3>文章打字速度趋势</h3>
+    <div class="st-tabs">${tabs}</div>
+    <div class="st-summary">
+      <span class="st-chip">区间平均 <b>${avg}</b> 字/分</span>
+      <span class="st-chip">有记录 <b>${pts.length}</b> 天</span>
+      <span class="st-chip">最新 <b>${pts[pts.length - 1].key.slice(5)}</b></span>
+    </div>
+    <div class="st-wrap">
+      <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="文章打字速度趋势">
+        ${grid}
+        <path class="area" d="${area}"></path>
+        <path class="line" d="${line}"></path>
+        ${dots}
+        <text x="${padL}" y="${H - 8}" class="axis">${days[0].slice(5)}</text>
+        <text x="${W - padR}" y="${H - 8}" class="axis" text-anchor="end">${days[days.length - 1].slice(5)}</text>
+        <text x="${padL - 6}" y="${padT + 4}" class="axis" text-anchor="end">${max}</text>
+        <text x="${padL - 6}" y="${baseY + 4}" class="axis" text-anchor="end">0</text>
+      </svg>
+    </div>`;
+}
 function renderStats() {
   const st = loadStats();
   const keystrokes = st.totalCorrect + st.totalWrong;
@@ -809,6 +917,7 @@ function renderStats() {
         ).join("") + `</div>`
       : `<div class="empty">暂无错键记录。</div>`
   );
+  renderSpeedTrend();
 }
 
 /* ================= 设置与主题 ================= */
@@ -947,8 +1056,14 @@ function bindEvents() {
   $("#btn-clear-data").addEventListener("click", () => {
     if (confirm("确定清除全部练习统计吗？")) {
       lsSet(LS_KEYS.stats, null);
+      lsSet(LS_KEYS.articleDaily, null);
       renderStats();
     }
+  });
+  /* 速度趋势时间范围切换 */
+  $("#stats-speed").addEventListener("click", e => {
+    const btn = e.target.closest(".st-tab");
+    if (btn) { speedTrendRange = btn.dataset.range; renderSpeedTrend(); }
   });
   /* 键盘输入 */
   document.addEventListener("keydown", e => {

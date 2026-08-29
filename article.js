@@ -556,6 +556,7 @@
     const acc = ks ? Math.round(A.stats.correct / ks * 100) : 100;
     const speed = Math.round(A.stats.itemsDone / Math.max(elapsed / 60000, 0.01));
     mergeRoundIntoStats(A.stats, elapsed);
+    if (typeof recordArticleDaily === "function") recordArticleDaily(A.stats.itemsDone, elapsed);
     if (A.articleId) {
       markDone(A.articleId);
       A.articleId = null;
@@ -581,6 +582,10 @@
     if (A.active && !A.finished) {
       goodFlushTime();
       saveProgress();
+      if (A.stats && A.stats.itemsDone > 0) {
+        const ms = artElapsed();
+        if (typeof recordArticleDaily === "function") recordArticleDaily(A.stats.itemsDone, ms);
+      }
     }
     A.active = false; A.finished = false; A.started = false;
     A.goodMode = false;
@@ -935,6 +940,10 @@
     const src = A.lastSource;
     if (!src || !src.paragraphs || !src.paragraphs.length) return;
     goodFlushTime();
+    if (A.active && !A.finished && A.stats && A.stats.itemsDone > 0) {
+      const ms = artElapsed();
+      if (typeof recordArticleDaily === "function") recordArticleDaily(A.stats.itemsDone, ms);
+    }
     A.articleId = A.lastSourceId || null;
     buildSession(src.title, src.byline, src.paragraphs);
     saveProgress();
@@ -1036,6 +1045,10 @@
     if (A.goodMode && A.active && !A.finished) {
       goodFlushTime();
       goodSave();
+    }
+    if (A.active && !A.finished && A.stats && A.stats.itemsDone > 0) {
+      const ms = artElapsed();
+      if (typeof recordArticleDaily === "function") recordArticleDaily(A.stats.itemsDone, ms);
     }
   });
   window.addEventListener("resize", () => {

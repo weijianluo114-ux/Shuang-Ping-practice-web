@@ -275,6 +275,22 @@ main{max-width:none;margin:0 0 0 132px;padding:18px 0 60px}
 .bar-line .cnt{color:var(--muted);text-align:right}
 .empty{color:var(--muted);font-size:0.875rem;padding:10px 0}
 
+/* ===== 文章速度趋势 ===== */
+.st-tabs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.st-tab{background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:999px;padding:6px 14px;font-size:0.8125rem;cursor:pointer;transition:all .15s}
+.st-tab:hover{border-color:var(--accent)}
+.st-tab.active{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
+.st-summary{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.st-chip{display:inline-flex;align-items:center;gap:6px;background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:5px 12px;font-size:0.8125rem;color:var(--muted)}
+.st-chip b{color:var(--accent);font-weight:800}
+.st-wrap{width:100%;overflow-x:auto}
+.st-wrap svg{display:block;width:100%;min-width:420px;height:auto}
+.st-wrap .area{fill:var(--accent-soft)}
+.st-wrap .line{fill:none;stroke:var(--accent);stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
+.st-wrap circle{fill:var(--accent);stroke:var(--card);stroke-width:1.5}
+.st-wrap .grid{stroke:var(--line);stroke-width:1;stroke-dasharray:3 4}
+.st-wrap .axis{fill:var(--muted);font-size:11px}
+
 /* ===== 弹窗 ===== */
 .modal-backdrop{
   position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;

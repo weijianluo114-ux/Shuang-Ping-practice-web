@@ -489,8 +489,7 @@
       }
       j = goodSlideWindow(j);     // 删除太旧的句子，窗口整体下移
       A.curIdx = j;
-      A.instantScroll = true;     // 本次定位直接跳转，不播放滚动动画
-      setCur(j);
+      setCur(j);                  // 保留平滑滚动动画，让下一句滑到居中位置
       saveProgress();
       updateLive();
       return;
@@ -802,7 +801,6 @@
         // 续练时也先删除过旧的句子，避免框里堆太多
         const j = goodSlideWindow(A.curIdx);
         A.curIdx = j;
-        A.instantScroll = true;
         setCur(j);
         updateLive();
         const c = A.session && A.session.flat ? A.session.flat[A.curIdx] : null;

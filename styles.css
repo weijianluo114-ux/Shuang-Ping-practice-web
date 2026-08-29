@@ -32,7 +32,6 @@ body{
   font-family:"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans CJK SC",system-ui,sans-serif;
   line-height:1.55;
   transition:background .25s,color .25s;
-  padding-left:96px;
 }
 
 /* ===== 顶部 ===== */
@@ -66,13 +65,12 @@ body{
 }
 .icon-btn:hover{border-color:var(--accent)}
 
-/* ===== 导航：固定在页面最左侧的竖向按钮栏 ===== */
+/* ===== 导航：固定在页面最左侧、顶部品牌区下方的竖向按钮栏 ===== */
 .tabs{
-  position:fixed;left:0;top:0;bottom:0;z-index:30;width:96px;
-  display:flex;flex-direction:column;align-items:stretch;gap:4px;
-  margin:0;max-width:none;padding:14px 8px;
-  background:var(--bg);border-right:1px solid var(--line);
-  overflow-y:auto;
+  position:fixed;left:16px;top:calc(var(--tb-h,78px) + 16px);z-index:19;width:100px;
+  display:flex;flex-direction:column;align-items:stretch;gap:6px;
+  margin:0;max-width:none;padding:0;
+  background:transparent;
 }
 .tab{
   border:none;background:transparent;color:var(--muted);cursor:pointer;
@@ -82,7 +80,7 @@ body{
 .tab:hover{background:var(--card);color:var(--text)}
 .tab.active{background:var(--card);color:var(--accent);box-shadow:var(--shadow)}
 
-main{max-width:none;margin:0;padding:18px 0 60px}
+main{max-width:none;margin:0 0 0 132px;padding:18px 0 60px}
 .view{display:none;max-width:1060px;margin:0 auto;padding:0 22px}
 .view.active{display:block;animation:fade .2s ease}
 #view-article.view{max-width:none;margin:0;padding:0}
@@ -285,13 +283,14 @@ main{max-width:none;margin:0;padding:18px 0 60px}
 }
 .modal-actions{display:flex;justify-content:flex-end;margin-top:18px}
 
-footer{max-width:1060px;margin:0 auto;padding:0 22px 34px;color:var(--muted);font-size:0.8125rem}
+footer{max-width:1060px;margin:0 0 0 132px;padding:0 22px 34px;color:var(--muted);font-size:0.8125rem}
 
 @media (max-width:720px){
-  body{padding-left:0}
+  main{margin-left:0}
+  footer{margin:0 auto}
   .tabs{
     position:static;width:auto;flex-direction:row;align-items:center;gap:4px;
-    padding:8px 10px;border-right:none;border-bottom:1px solid var(--line);
+    padding:8px 10px;border-bottom:1px solid var(--line);
     overflow-x:auto;overflow-y:hidden;
   }
   .tab{width:auto;padding:8px 12px}

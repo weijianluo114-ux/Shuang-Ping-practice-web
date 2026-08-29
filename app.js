@@ -851,6 +851,10 @@ function normalizeFontSize(v) {
 function applyFontSize() {
   document.documentElement.style.fontSize = normalizeFontSize(settings.fontSize) + "px";
 }
+function updateTopbarH() {
+  const tb = document.getElementById("topbar");
+  if (tb) document.documentElement.style.setProperty("--tb-h", tb.offsetHeight + "px");
+}
 function openModal() {
   $("#set-hint").checked = !!settings.hint;
   $("#set-sound").checked = !!settings.sound;
@@ -870,6 +874,7 @@ function closeModal() {
   lsSet(LS_KEYS.settings, settings);
   applyTheme(settings.theme);
   applyFontSize();
+  updateTopbarH();
   applyArticleFont();
   $("#modal").hidden = true;
   if (window.ArticlePractice) ArticlePractice.onSettings();
@@ -968,6 +973,8 @@ applyFontSize();
 applyArticleFont();
 applySchemeColor();
 renderSchemePicker();
+updateTopbarH();
 renderArtKeyboard();
 setView("keyboard");
 bindEvents();
+window.addEventListener("resize", updateTopbarH);

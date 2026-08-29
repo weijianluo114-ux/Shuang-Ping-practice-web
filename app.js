@@ -856,6 +856,14 @@ function updateTopbarH() {
   const tb = document.getElementById("topbar");
   if (tb) document.documentElement.style.setProperty("--tb-h", tb.offsetHeight + "px");
 }
+function renderVersionBadge() {
+  const el = document.getElementById("ver-badge");
+  if (!el) return;
+  const v = window.APP_VERSION || {};
+  const dev = v.channel === "dev";
+  el.textContent = (dev ? "测试版 " : "") + "v" + (v.version || "1.0.0");
+  el.classList.toggle("dev", dev);
+}
 function openModal() {
   $("#set-hint").checked = !!settings.hint;
   $("#set-sound").checked = !!settings.sound;
@@ -976,6 +984,7 @@ applySchemeColor();
 renderSchemePicker();
 updateTopbarH();
 renderArtKeyboard();
+renderVersionBadge();
 setView(lsGet(LS_KEYS.view, "article"));
 bindEvents();
 window.addEventListener("resize", updateTopbarH);

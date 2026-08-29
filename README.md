@@ -8,6 +8,29 @@
 
 建议把它设为浏览器书签，每天练 10 分钟。
 
+## 版本与发布流程（正式版 / 本地测试版）
+
+采用**单仓库双分支**：
+
+| 分支 | 用途 | 发布 |
+| --- | --- | --- |
+| `main` | 正式发行版 | GitHub Pages 自动发布 `https://weijianluo114-ux.github.io/Shuang-Ping-practice-web/` |
+| `dev`  | 本地测试版 | 不发布，只在本地 `file://` 打开测试 |
+
+版本号写在 `version.js`：`channel = "release"` 为正式版，`channel = "dev"` 为测试版；
+页面顶栏会显示「v版本号」（正式版）或「测试版 v版本号」（测试版）。
+
+日常开发流程：
+
+1. 在 `dev` 分支上改代码，本地双击 `index.html` 测试；
+2. 用 `node --check app.js` 和 `node --check article.js` 做语法检查（无头 Chrome 冒烟测试可选）；
+3. 测试通过后：`git checkout main && git merge dev`；
+4. 把 `version.js` 的 `channel` 改回 `"release"`（合并后只改这一行），并顺手 bump 版本号；
+5. `git push origin main`，GitHub Pages 约 1 分钟后更新；
+6. 每次正式发布打 tag：`git tag vX.Y.Z && git push origin vX.Y.Z`。
+
+数据天然隔离：本地测试是 `file://`，正式版是 `https://...github.io`，两者 localStorage 互不相通。
+
 ## 功能
 
 - **键位图**：小鹤双拼 / 自然码 / 智能ABC / 微软双拼 四套方案的完整键位图，

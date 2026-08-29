@@ -311,14 +311,18 @@
     }
     return d;
   }
-  function splitSpeedSegments(pts, flags) {
+  function speedCubicSegments(pts) {
     const out = [];
-    let i = 0;
-    while (i < pts.length) {
-      const wrong = !!flags[i];
-      const seg = [];
-      while (i < pts.length && !!flags[i] === wrong) { seg.push(pts[i]); i++; }
-      out.push({ wrong, pts: seg });
+    for (let i = 0; i < pts.length - 1; i++) {
+      const p0 = pts[Math.max(i - 1, 0)];
+      const p1 = pts[i];
+      const p2 = pts[i + 1];
+      const p3 = pts[Math.min(i + 2, pts.length - 1)];
+      const c1x = p1[0] + (p2[0] - p0[0]) / 6;
+      const c1y = p1[1] + (p2[1] - p0[1]) / 6;
+      const c2x = p2[0] - (p3[0] - p1[0]) / 6;
+      const c2y = p2[1] - (p3[1] - p1[1]) / 6;
+      out.push(`M ${p1[0].toFixed(1)},${p1[1].toFixed(1)} C ${c1x.toFixed(1)},${c1y.toFixed(1)} ${c2x.toFixed(1)},${c2y.toFixed(1)} ${p2[0].toFixed(1)},${p2[1].toFixed(1)}`);
     }
     return out;
   }
@@ -349,14 +353,10 @@
       const line = smoothSpeedPath(pts);
       const area = `${line} L ${w.toFixed(1)},${h} L 0,${h} Z`;
       let strokes = "";
-      for (const seg of splitSpeedSegments(pts, flags)) {
-        const col = seg.wrong ? "var(--bad)" : "var(--accent)";
-        if (seg.pts.length === 1) {
-          strokes += `<circle cx="${seg.pts[0][0].toFixed(1)}" cy="${seg.pts[0][1].toFixed(1)}" r="3.5" fill="${col}"/>`;
-        } else {
-          const d = smoothSpeedPath(seg.pts);
-          strokes += `<path d="${d}" fill="none" stroke="${col}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`;
-        }
+      const cubics = speedCubicSegments(pts);
+      for (let i = 0; i < cubics.length; i++) {
+        const col = flags[i] ? "var(--bad)" : "var(--accent)";
+        strokes += `<path d="${cubics[i]}" fill="none" stroke="${col}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`;
       }
       shape = `<path d="${area}" fill="var(--accent-soft)"/>${strokes}`;
     }

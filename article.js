@@ -238,7 +238,37 @@
     if (!c || !c.el) return;
     c.el.classList.add("cur");
     renderCurSlots();
-    c.el.scrollIntoView({ block: "nearest", inline: "nearest" });
+    positionArtText();
+  }
+
+  /* 固定两行窗口：把当前字所在行贴到窗口顶部，下一行自然露在下面预览 */
+  let scrollAnimId = 0;
+  function smoothScrollTo(box, y) {
+    const id = ++scrollAnimId;
+    if (Math.abs(y - box.scrollTop) < 0.5) return;
+    let steps = 0;
+    function step() {
+      if (id !== scrollAnimId) return;
+      const remaining = y - box.scrollTop;
+      if (Math.abs(remaining) < 0.5 || steps++ > 40) { box.scrollTop = y; return; }
+      box.scrollTop += remaining * 0.22;
+      setTimeout(step, 16);
+    }
+    setTimeout(step, 16);
+  }
+  function positionArtText() {
+    const box = $("#art-text");
+    const c = A.session && A.session.flat ? A.session.flat[A.curIdx] : null;
+    if (!box || !c || !c.el) return;
+    const boxRect = box.getBoundingClientRect();
+    const elRect = c.el.getBoundingClientRect();
+    if (!boxRect.height) return;
+    const padTop = parseFloat(getComputedStyle(box).paddingTop) || 0;
+    const lineTop = elRect.top - boxRect.top + box.scrollTop; // 换算成内容坐标
+    const targetY = Math.max(0, lineTop - padTop);
+    const maxY = Math.max(0, box.scrollHeight - box.clientHeight);
+    const y = Math.min(targetY, maxY);
+    smoothScrollTo(box, y);
   }
 
   function renderCurSlots() {
@@ -869,7 +899,7 @@
     const boldEl = $("#art-bold");
     if (boldEl) boldEl.checked = !!settings.articleBold;
     if (typeof applyArticleFont === "function") applyArticleFont();
-    if (A.session) refreshHints();
+    if (A.session) { refreshHints(); positionArtText(); }
   }
 
   /* ---------- 初始化 ---------- */
@@ -912,11 +942,13 @@
     settings.articleFont = e.target.value;
     lsSet(LS_KEYS.settings, settings);
     if (typeof applyArticleFont === "function") applyArticleFont();
+    if (A.session) positionArtText();
   });
   $("#art-bold").addEventListener("change", e => {
     settings.articleBold = e.target.checked;
     lsSet(LS_KEYS.settings, settings);
     if (typeof applyArticleFont === "function") applyArticleFont();
+    if (A.session) positionArtText();
   });
 
   window.addEventListener("beforeunload", () => {
@@ -924,6 +956,9 @@
       goodFlushTime();
       goodSave();
     }
+  });
+  window.addEventListener("resize", () => {
+    if (A.active && !A.finished) positionArtText();
   });
 
   window.ArticlePractice = { onView, onKey, onEscape, onSchemeChange, onSettings, renderList };

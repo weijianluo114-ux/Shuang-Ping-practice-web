@@ -36,6 +36,9 @@
     goodMode: false,     // 是否处于“好词好句”无限练模式
     goodLoading: false,  // 正在联网取下一批句子
     good: null,          // { total, timeMs, days:{}, progress:{pool,idx,ts} }
+    goodNextPool: null,  // 提前预加载好的下一批句子（字符串数组）
+    goodPrefetching: false,
+    goodBatchGen: 0,     // 批次代号，用于作废过期预加载
     autoStarted: false,  // 是否已做过启动自动开文
     speeds: [],          // 每字瞬时速度采样（字/分）
     lastCharTime: 0,
@@ -99,7 +102,7 @@
           const raw = aligned ? pys[i] : singlePy(ch);
           if (raw && raw !== ch) { py = raw; code = codeFor(raw); }
         }
-        return { ch, py, code, skip: !code, done: !code, typedLen: 0, errs: 0, el: null, pyEl: null, g: 0, seg: 0 };
+        return { ch, py, code, skip: !code, done: !code, typedLen: 0, errs: 0, wrongRun: 0, revealed: false, el: null, pyEl: null, g: 0, seg: 0 };
       });
       if (items.some(x => !x.skip)) groups.push(items);
     }
@@ -206,8 +209,9 @@
   /* ---------- 渲染正文 ---------- */
   function cellHtml(c) {
     const doneCls = (c.done && !c.skip) ? " done" : "";
+    const revealCls = c.revealed ? " reveal" : "";
     const errAttr = c.errs ? ` data-errs="${Math.min(c.errs, 4)}"` : "";
-    return `<span class="ac${c.skip ? " skip" : ""}${doneCls}"${errAttr}><i class="py">${escapeHtml(c.py || "")}</i><b class="hz">${escapeHtml(c.ch)}</b></span>`;
+    return `<span class="ac${c.skip ? " skip" : ""}${doneCls}${revealCls}"${errAttr}><i class="py">${escapeHtml(c.py || "")}</i><b class="hz">${escapeHtml(c.ch)}</b></span>`;
   }
 
   function renderText() {
@@ -240,7 +244,16 @@
   function renderCurSlots() {
     const cur = A.session && A.session.flat ? A.session.flat[A.curIdx] : null;
     if (!cur || !cur.pyEl) return;
-    if (!settings.hint) { cur.pyEl.innerHTML = ""; return; }
+    if (!settings.hint) {
+      if (cur.revealed) {
+        cur.pyEl.textContent = cur.py || "";
+        if (cur.el) cur.el.classList.add("reveal");
+      } else {
+        cur.pyEl.innerHTML = "";
+        if (cur.el) cur.el.classList.remove("reveal");
+      }
+      return;
+    }
     cur.pyEl.innerHTML = Array.from(cur.code || "").map((k, j) =>
       `<em class="${j < cur.typedLen ? "hit" : ""}">${escapeHtml(k)}</em>`
     ).join("") || "·";
@@ -251,19 +264,47 @@
     if (box) box.classList.toggle("nohint", !settings.hint);
     if (!A.session) return;
     A.session.flat.forEach(c => {
-      if (c.pyEl) c.pyEl.textContent = c.py || "";
+      if (!c.pyEl) return;
+      if (settings.hint) {
+        c.pyEl.textContent = c.py || "";
+        if (c.el) c.el.classList.remove("reveal");
+      } else if (c.revealed) {
+        c.pyEl.textContent = c.py || "";
+        if (c.el) c.el.classList.add("reveal");
+      } else {
+        c.pyEl.textContent = "";
+        if (c.el) c.el.classList.remove("reveal");
+      }
     });
     renderCurSlots();
+  }
+
+  function revealHintFor(c) {
+    if (!c) return;
+    c.revealed = true;
+    if (c.el) c.el.classList.add("reveal");
+    if (c.pyEl) c.pyEl.textContent = c.py || "";
+  }
+  function clearReveal(c) {
+    if (!c) return;
+    c.revealed = false;
+    if (c.el) c.el.classList.remove("reveal");
+    if (c.pyEl) {
+      if (settings.hint) c.pyEl.textContent = c.py || "";
+      else c.pyEl.textContent = "";
+    }
   }
 
   function flashErr() {
     const c = A.session && A.session.flat ? A.session.flat[A.curIdx] : null;
     if (!c || !c.el) return;
     c.errs = (c.errs || 0) + 1;
+    c.wrongRun = (c.wrongRun || 0) + 1;
     c.el.dataset.errs = String(Math.min(c.errs, 4));
     c.el.classList.remove("err");
     void c.el.offsetWidth;
     c.el.classList.add("err");
+    if (!settings.hint && c.wrongRun >= 3 && !c.revealed) revealHintFor(c);
   }
 
   /* ---------- 实时统计 / 进度 / 速度曲线 ---------- */
@@ -392,6 +433,7 @@
     if (!c) return;
     if (k === c.code[c.typedLen]) {
       c.typedLen++;
+      c.wrongRun = 0;
       A.stats.correct++;
       A.stats.combo++;
       if (A.stats.combo > A.stats.bestCombo) A.stats.bestCombo = A.stats.combo;
@@ -400,6 +442,8 @@
         const hadErrs = c.errs > 0;
         c.done = true;
         c.errs = 0;
+        c.wrongRun = 0;
+        clearReveal(c);
         if (c.el) { c.el.classList.remove("err"); delete c.el.dataset.errs; }
         A.stats.itemsDone++;
         recordSpeed(hadErrs);
@@ -429,7 +473,7 @@
     let j = A.curIdx + 1;
     while (j < s.flat.length && s.flat[j].skip) j++;
     const batchDone = j >= s.flat.length;
-    if (A.goodMode && cur && (batchDone || s.flat[j].g > cur.g)) goodRecordSentence();
+    if (A.goodMode && cur && (batchDone || s.flat[j].g > cur.g)) goodRecordSentence(cur.g);
     if (batchDone || countDone(s.flat) >= A.total) {
       A.curIdx = -1;
       if (A.goodMode) { goodNextBatch(); return; }
@@ -454,6 +498,8 @@
     if (c.typedLen > 0) {
       c.typedLen--;
       c.errs = 0;
+      c.wrongRun = 0;
+      clearReveal(c);
       if (c.el) { c.el.classList.remove("err"); delete c.el.dataset.errs; }
       A.stats.correct = Math.max(0, A.stats.correct - 1);
       A.stats.combo = 0;
@@ -466,9 +512,9 @@
       if (!p.skip) {
         if (c.el) {
           c.el.classList.remove("cur");
-          if (c.pyEl && settings.hint) c.pyEl.textContent = c.py || "";
+          clearReveal(c);
         }
-        p.done = false; p.typedLen = 0; p.errs = 0;
+        p.done = false; p.typedLen = 0; p.errs = 0; p.wrongRun = 0;
         if (p.el) p.el.classList.remove("done", "err");
         A.stats.itemsDone = Math.max(0, A.stats.itemsDone - 1);
         A.stats.combo = 0;
@@ -521,6 +567,8 @@
     }
     A.active = false; A.finished = false; A.started = false;
     A.goodMode = false;
+    A.goodNextPool = null;
+    A.goodPrefetching = false;
     pauseArtTimer();
     A.session = null;
     A.segments = [];
@@ -566,9 +614,10 @@
       goodLoad().timeMs += artElapsed();
     }
   }
-  function goodRecordSentence() {
+  function goodRecordSentence(g) {
     goodLoad().total += 1;
     goodSave();
+    if (g >= 6) goodPrefetch();
   }
   function fmtGoodTime(ms) {
     const totalMin = Math.floor((ms || 0) / 60000);
@@ -582,15 +631,31 @@
     const resume = g.progress && Array.isArray(g.progress.pool) && g.progress.pool.length ? " · 可续练" : "";
     return `<button class="art-card good" id="btn-art-good"><strong>💎 好词好句（联网无限练）${resume ? `<span class="badge">续练</span>` : ""}</strong><span class="meta">已练 ${g.total || 0} 句 · 时长 ${fmtGoodTime(g.timeMs || 0)} · 坚持 ${days} 天</span></button>`;
   }
+  async function goodPrefetch() {
+    if (A.goodPrefetching || A.goodNextPool || !A.goodMode) return;
+    A.goodPrefetching = true;
+    const gen = A.goodBatchGen;
+    let list = [];
+    try { list = await fetchSentences(10); } catch (e) { console.warn("[好词好句] 预加载失败", e); }
+    if (A.goodMode && gen === A.goodBatchGen && !A.goodNextPool && list.length >= 3) {
+      A.goodNextPool = list.map(s => s.t);
+    }
+    A.goodPrefetching = false;
+  }
   async function goodNextBatch() {
     if (A.goodLoading || !A.goodMode) return;
     A.goodLoading = true;
+    A.goodBatchGen = (A.goodBatchGen || 0) + 1; // 作废仍在途的预加载
     A.curIdx = -1;
     $("#art-live").innerHTML = `<span class="chip">💎 已练 <b>${goodLoad().total}</b> 句</span><span class="chip">正在加载下一批…</span>`;
     goodFlushTime();
-    let list = [];
-    try { list = await fetchSentences(10); } catch (e) { console.warn("[好词好句] 联网获取失败", e); }
-    if (!A.goodMode) { A.goodLoading = false; return; } // 加载期间用户已退出
+    let list = A.goodNextPool || null;
+    A.goodNextPool = null;
+    A.goodPrefetching = false;
+    if (!list || list.length < 3) {
+      try { list = await fetchSentences(10); } catch (e) { console.warn("[好词好句] 联网获取失败", e); }
+      if (!A.goodMode) { A.goodLoading = false; return; } // 加载期间用户已退出
+    }
     if (list.length < 3) {
       const fb = shuffle((window.SP_ARTICLES || {}).sentences || []).slice(0, 10);
       list = fb.map(s => (typeof s === "string" ? { t: s } : s));
@@ -601,7 +666,7 @@
       updateLive();
       return;
     }
-    A.good.pool = list.map(s => s.t);
+    A.good.pool = list.map(s => (typeof s === "string" ? s : s.t));
     A.good.progress = null;
     A.lastSource = { title: "好词好句", byline: "一言 hitokoto · 无限续练", paragraphs: A.good.pool };
     A.articleId = null; A.lastSourceId = null;
@@ -615,12 +680,19 @@
     A.good.days[todayStr()] = 1;
     goodSave();
     A.goodMode = true;
+    A.goodNextPool = null;
+    A.goodPrefetching = false;
     A.articleId = null; A.lastSourceId = null;
     const saved = A.good.progress;
     if (saved && Array.isArray(saved.pool) && saved.pool.length && typeof saved.idx === "number") {
+      A.goodBatchGen = (A.goodBatchGen || 0) + 1;
       A.good.pool = saved.pool;
       A.lastSource = { title: "好词好句", byline: "一言 hitokoto · 续练", paragraphs: A.good.pool };
-      if (buildSession(A.lastSource.title, A.lastSource.byline, A.lastSource.paragraphs)) applyResume(saved.idx);
+      if (buildSession(A.lastSource.title, A.lastSource.byline, A.lastSource.paragraphs)) {
+        applyResume(saved.idx);
+        const c = A.session && A.session.flat ? A.session.flat[A.curIdx] : null;
+        if (c && c.g >= 6) goodPrefetch();
+      }
       return;
     }
     goodNextBatch();

@@ -358,6 +358,7 @@ footer{max-width:1060px;margin:0 auto;padding:0 22px 34px;color:var(--muted);fon
 .ac.err{animation:artShake .22s}
 @keyframes artShake{0%,100%{transform:translateX(0)}25%{transform:translateX(-3px)}75%{transform:translateX(3px)}}
 .art-text.nohint .py{visibility:hidden}
+.art-text.nohint .ac.reveal .py{visibility:visible;color:var(--warn, #E8A33D);font-weight:700}
 
 /* 底部迷你键盘 */
 .art-bottom{margin-top:auto;display:flex;flex-direction:column;align-items:center;gap:10px;padding:0 12px 8px}

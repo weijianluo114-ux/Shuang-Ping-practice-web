@@ -13,7 +13,7 @@
   }
 
   const HAN = /[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]/;
-  const A_LS = { progress: "sp_article_progress_v1", done: "sp_article_done_v1", good: "sp_good_v1" };
+  const A_LS = { progress: "sp_article_progress_v1", done: "sp_article_done_v1", good: "sp_good_v1", mode: "sp_article_mode_v1" };
 
   const A = {
     session: null,       // { title, byline, groups:[[char...]], flat:[char...] }
@@ -627,6 +627,9 @@
   function goodSave() {
     if (A.good) lsSet(A_LS.good, A.good);
   }
+  function saveArticleMode(mode) {
+    lsSet(A_LS.mode, mode);
+  }
   function goodFlushTime() {
     if (A.goodMode && A.active && !A.finished) {
       goodLoad().timeMs += artElapsed();
@@ -782,6 +785,7 @@
   }
   function startGood() {
     if (A.busy || A.goodLoading) return;
+    saveArticleMode("good");
     goodLoad();
     A.good.days[todayStr()] = 1;
     goodSave();
@@ -847,6 +851,7 @@
 
   /* ---------- 启动各类练习 ---------- */
   function startArticle(art, resumeIdx) {
+    saveArticleMode("article");
     A.articleId = art.id || null;
     A.lastSourceId = art.id || null;
     A.lastSource = { title: art.title, byline: art.author || "佚名", paragraphs: art.paragraphs || [] };
@@ -857,6 +862,7 @@
   }
 
   function startSentenceSet(cat) {
+    saveArticleMode("article");
     const sentences = (window.SP_ARTICLES || {}).sentences || [];
     let pool = cat === "全部" ? sentences : sentences.filter(s => (s.cat || "其他") === cat);
     if (!pool.length) { toast("该分类暂无句子"); return; }
@@ -891,6 +897,7 @@
 
   async function startOnline() {
     if (A.busy) return;
+    saveArticleMode("article");
     const btn = $("#btn-art-online");
     if (btn) btn.innerHTML = "<strong>🌐 抓取中…</strong><span class=\"meta\">正在请求一言 API</span>";
     A.busy = true;
@@ -915,6 +922,7 @@
   }
 
   function startCustom() {
+    saveArticleMode("article");
     const ta = $("#art-custom-text");
     const paragraphs = (ta.value || "").split(/\n+/).map(s => s.trim()).filter(Boolean);
     if (!paragraphs.length) { toast("请先粘贴或输入一段文字"); return; }
@@ -936,6 +944,8 @@
   function autoStartArticle() {
     if (A.autoStarted) return;
     A.autoStarted = true;
+    // 上次退出时正在练好词好句：直接恢复到好词好句续练，而不是随机开一篇普通文章
+    if (lsGet(A_LS.mode, null) === "good") { startGood(); return; }
     const saved = lsGet(A_LS.progress, null);
     if (saved && saved.id) {
       const art = findArticle(saved.id);

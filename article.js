@@ -1033,5 +1033,7 @@
   });
 
   window.ArticlePractice = { onView, onKey, onEscape, onSchemeChange, onSettings, renderList };
-  setView("article");
+  // 若启动时恢复的是文章视图，补一次 onView 以渲染列表/自动开文；
+  // 其它视图由 app.js 的 setView 完成初始化，这里不再强制切到文章。
+  if (typeof currentView !== "undefined" && currentView === "article") onView("article");
 })();

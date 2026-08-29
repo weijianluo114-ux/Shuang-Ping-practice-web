@@ -213,7 +213,7 @@ function lineToRecord(line) {
 const WORDS = WORD_LINES.map(lineToRecord);
 const SENTENCES = SENTENCE_LINES.map(lineToRecord);
 /* ================= 状态与存储 ================= */
-const LS_KEYS = { scheme: "sp_scheme_v1", settings: "sp_settings_v1", stats: "sp_stats_v1", custom: "sp_custom_v1" };
+const LS_KEYS = { scheme: "sp_scheme_v1", settings: "sp_settings_v1", stats: "sp_stats_v1", custom: "sp_custom_v1", view: "sp_view_v1" };
 
 function lsGet(key, fallback) {
   try {
@@ -344,6 +344,7 @@ function soundDone() {
 /* ================= 视图切换 ================= */
 function setView(name) {
   currentView = name;
+  lsSet(LS_KEYS.view, name);
   $$(".tab").forEach(t => t.classList.toggle("active", t.dataset.view === name));
   $$(".view").forEach(v => v.classList.toggle("active", v.id === "view-" + name));
   handleTimerOnViewChange();
@@ -975,6 +976,6 @@ applySchemeColor();
 renderSchemePicker();
 updateTopbarH();
 renderArtKeyboard();
-setView("keyboard");
+setView(lsGet(LS_KEYS.view, "article"));
 bindEvents();
 window.addEventListener("resize", updateTopbarH);

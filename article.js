@@ -128,6 +128,7 @@
     A.sessionStartIdx = first;
     A.active = true; A.finished = false; A.started = false;
     A.stats = { correct: 0, wrong: 0, itemsDone: 0, bestCombo: 0, combo: 0, wrongKeys: {} };
+    A.goodMerged = null;
     A.speeds = []; A.speedWrong = []; A.lastCharTime = 0;
     resetArtTimer();
     $("#article-setup").hidden = true;
@@ -555,7 +556,7 @@
     const ks = A.stats.correct + A.stats.wrong;
     const acc = ks ? Math.round(A.stats.correct / ks * 100) : 100;
     const speed = Math.round(A.stats.itemsDone / Math.max(elapsed / 60000, 0.01));
-    mergeRoundIntoStats(A.stats, elapsed);
+    if (A.goodMode) goodMergeStats(); else mergeRoundIntoStats(A.stats, elapsed);
     if (typeof recordArticleDaily === "function") recordArticleDaily(A.stats.itemsDone, elapsed);
     if (A.articleId) {
       markDone(A.articleId);
@@ -586,6 +587,7 @@
         const ms = artElapsed();
         if (typeof recordArticleDaily === "function") recordArticleDaily(A.stats.itemsDone, ms);
       }
+      if (A.goodMode) goodMergeStats();
     }
     A.active = false; A.finished = false; A.started = false;
     A.goodMode = false;
@@ -643,8 +645,36 @@
   function goodRecordSentence(g) {
     goodLoad().total += 1;
     goodSave();
+    goodMergeStats();
     const poolLen = A.good.pool ? A.good.pool.length : 0;
     if (poolLen && g >= poolLen - 4) goodPrefetch();
+  }
+  /* 好词好句无限续练没有“完成”节点：按增量把当前 session 的统计并入全局，
+     避免整段 session 只在 finish 时合并导致错键分布等累计丢失。 */
+  function goodMergeStats() {
+    if (!A.goodMode || !A.stats) return;
+    const s = A.stats;
+    const base = A.goodMerged || { correct: 0, wrong: 0, itemsDone: 0, bestCombo: 0, wrongKeys: {}, timeMs: 0 };
+    const inc = {
+      correct: s.correct - base.correct,
+      wrong: s.wrong - base.wrong,
+      itemsDone: s.itemsDone - base.itemsDone,
+      bestCombo: s.bestCombo,
+      wrongKeys: {},
+    };
+    for (const [k, v] of Object.entries(s.wrongKeys)) {
+      const dv = v - (base.wrongKeys[k] || 0);
+      if (dv > 0) inc.wrongKeys[k] = dv;
+    }
+    const elapsed = artElapsed();
+    const incTime = Math.max(0, elapsed - base.timeMs);
+    if (inc.correct > 0 || inc.wrong > 0 || inc.itemsDone > 0) {
+      mergeRoundIntoStats(inc, incTime);
+    }
+    A.goodMerged = {
+      correct: s.correct, wrong: s.wrong, itemsDone: s.itemsDone,
+      bestCombo: s.bestCombo, wrongKeys: Object.assign({}, s.wrongKeys), timeMs: elapsed,
+    };
   }
   function fmtGoodTime(ms) {
     const totalMin = Math.floor((ms || 0) / 60000);
@@ -944,6 +974,7 @@
       const ms = artElapsed();
       if (typeof recordArticleDaily === "function") recordArticleDaily(A.stats.itemsDone, ms);
     }
+    if (A.goodMode && A.active && !A.finished) goodMergeStats();
     A.articleId = A.lastSourceId || null;
     buildSession(src.title, src.byline, src.paragraphs);
     saveProgress();
@@ -1045,6 +1076,7 @@
     if (A.goodMode && A.active && !A.finished) {
       goodFlushTime();
       goodSave();
+      goodMergeStats();
     }
     if (A.active && !A.finished && A.stats && A.stats.itemsDone > 0) {
       const ms = artElapsed();

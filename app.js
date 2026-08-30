@@ -345,6 +345,7 @@ function soundDone() {
 function setView(name) {
   currentView = name;
   lsSet(LS_KEYS.view, name);
+  window.scrollTo(0, 0);
   $$(".tab").forEach(t => t.classList.toggle("active", t.dataset.view === name));
   $$(".view").forEach(v => v.classList.toggle("active", v.id === "view-" + name));
   handleTimerOnViewChange();

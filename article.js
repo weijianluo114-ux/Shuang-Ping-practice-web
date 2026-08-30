@@ -131,6 +131,7 @@
     A.goodMerged = null;
     A.speeds = []; A.speedWrong = []; A.lastCharTime = 0;
     resetArtTimer();
+    window.scrollTo(0, 0);
     $("#article-setup").hidden = true;
     $("#article-area").hidden = false;
     $("#art-finish").hidden = true;
@@ -597,6 +598,7 @@
     A.goodDoneBase = 0;
     pauseArtTimer();
     A.session = null;
+    window.scrollTo(0, 0);
     $("#article-area").hidden = true;
     $("#art-finish").hidden = true;
     $("#article-setup").hidden = false;

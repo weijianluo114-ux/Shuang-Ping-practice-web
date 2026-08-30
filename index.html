@@ -136,6 +136,8 @@
         <textarea id="art-custom-text" rows="4" placeholder="粘贴或输入任意中文……空行会分成新的段落"></textarea>
         <div class="art-custom-actions">
           <button class="btn primary" id="btn-art-custom">练习这段文字</button>
+          <button class="btn" id="btn-art-import">📂 导入文件练习</button>
+          <input type="file" id="art-file-input" accept=".txt,.md,.docx" hidden>
         </div>
       </div>
     </div>
@@ -312,6 +314,7 @@
 </div>
 
 <script src="pinyin-pro.min.js"></script>
+<script src="jszip.min.js"></script>
 <script src="articles.js"></script>
 <script src="version.js"></script>
 <script src="app.js"></script>

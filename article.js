@@ -131,6 +131,7 @@
     A.goodMerged = null;
     A.speeds = []; A.speedWrong = []; A.lastCharTime = 0;
     resetArtTimer();
+    window.scrollTo(0, 0);
     $("#article-setup").hidden = true;
     $("#article-area").hidden = false;
     $("#art-finish").hidden = true;
@@ -597,6 +598,7 @@
     A.goodDoneBase = 0;
     pauseArtTimer();
     A.session = null;
+    window.scrollTo(0, 0);
     $("#article-area").hidden = true;
     $("#art-finish").hidden = true;
     $("#article-setup").hidden = false;
@@ -966,6 +968,132 @@
     buildSession(A.lastSource.title, A.lastSource.byline, paragraphs);
   }
 
+  /* ---------- 导入本地文件（.txt / .md / .docx） ---------- */
+  function decodeTextBuffer(buf) {
+    const u8 = new Uint8Array(buf);
+    if (u8.length >= 3 && u8[0] === 0xEF && u8[1] === 0xBB && u8[2] === 0xBF) {
+      return new TextDecoder("utf-8").decode(u8.subarray(3));
+    }
+    if (u8.length >= 2 && u8[0] === 0xFF && u8[1] === 0xFE) {
+      return new TextDecoder("utf-16le").decode(u8.subarray(2));
+    }
+    if (u8.length >= 2 && u8[0] === 0xFE && u8[1] === 0xFF) {
+      return new TextDecoder("utf-16be").decode(u8.subarray(2));
+    }
+    try {
+      return new TextDecoder("utf-8", { fatal: true }).decode(u8);
+    } catch (e) {
+      try { return new TextDecoder("gbk").decode(u8); }
+      catch (e2) { return new TextDecoder("utf-8").decode(u8); }
+    }
+  }
+  function cleanMarkdown(md) {
+    const lines = String(md || "").replace(/\r\n?/g, "\n").split("\n");
+    const out = [];
+    let inCode = false;
+    for (let line of lines) {
+      if (/^\s*```/.test(line)) { inCode = !inCode; continue; }
+      if (inCode) { out.push(line); continue; }
+      line = line
+        .replace(/<!--[\s\S]*?-->/g, "")
+        .replace(/<[^>]*>/g, "")
+        .replace(/!\[[^\]]*\]\([^)]*\)/g, "")
+        .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
+        .replace(/\*\*([^*]+)\*\*/g, "$1")
+        .replace(/__([^_]+)__/g, "$1")
+        .replace(/~~([^~]+)~~/g, "$1")
+        .replace(/`([^`]*)`/g, "$1")
+        .replace(/^\s{0,3}#{1,6}\s+/, "")
+        .replace(/^\s*>\s?/, "")
+        .replace(/^\s*[-*+]\s+/, "")
+        .replace(/^\s*\d+[.)]\s+/, "")
+        .replace(/^\s*[-*_]{3,}\s*$/, "")
+        .replace(/\|/g, " ")
+        .replace(/\*([^*\s][^*]*?)\*/g, "$1")
+        .trim();
+      if (line) out.push(line);
+    }
+    return out.join("\n");
+  }
+  function splitImportedParagraphs(text) {
+    const paras = String(text || "").replace(/\r\n?/g, "\n").split(/\n{2,}/).map(s => s.trim()).filter(Boolean);
+    const out = [];
+    for (const p of paras) {
+      if (p.length <= 400) { out.push(p); continue; }
+      const parts = p.split(/(?<=[。！？；!?;])/);
+      let cur = "";
+      for (const part of parts) {
+        if ((cur + part).length > 400 && cur) { out.push(cur.trim()); cur = part; }
+        else cur += part;
+      }
+      if (cur.trim()) out.push(cur.trim());
+    }
+    return out.length ? out : [String(text || "").trim()].filter(Boolean);
+  }
+  function parseDocxXml(xml) {
+    const doc = new DOMParser().parseFromString(xml, "application/xml");
+    if (doc.getElementsByTagName("parsererror").length) throw new Error("docx XML 解析失败");
+    const paras = [];
+    for (const p of doc.getElementsByTagName("w:p")) {
+      let text = "";
+      // w:t 通常嵌套在 w:r 里，按文档顺序遍历段内所有元素
+      for (const n of p.getElementsByTagName("*")) {
+        const name = n.nodeName;
+        if (name === "w:t") text += n.textContent || "";
+        else if (name === "w:tab" || name === "w:br" || name === "w:cr") text += " ";
+      }
+      text = text.trim();
+      if (text) paras.push(text);
+    }
+    return paras;
+  }
+  function startImportedFile(name, paragraphs) {
+    saveArticleMode("article");
+    A.articleId = null; A.lastSourceId = null;
+    const n = paragraphs.join("").replace(/\s/g, "").length;
+    A.lastSource = { title: "📄 " + name, byline: "本地文件 · " + n + " 字", paragraphs };
+    buildSession(A.lastSource.title, A.lastSource.byline, paragraphs);
+  }
+  function handleImportFile(file) {
+    if (!file) return;
+    const name = file.name || "未命名";
+    const ext = (name.split(".").pop() || "").toLowerCase();
+    if (!/^(txt|md|docx)$/.test(ext)) { toast("仅支持 .txt / .md / .docx 文件"); return; }
+    if (file.size > 5 * 1024 * 1024) { toast("文件超过 5MB，请先精简后再导入"); return; }
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const buf = reader.result;
+        if (ext === "docx") {
+          if (typeof JSZip === "undefined") { toast("JSZip 未加载，无法解析 docx"); return; }
+          JSZip.loadAsync(buf)
+            .then(zip => {
+              const f = zip.file("word/document.xml");
+              if (!f) throw new Error("缺少 word/document.xml");
+              return f.async("string");
+            })
+            .then(xml => {
+              const paras = parseDocxXml(xml);
+              if (!paras.length) { toast("文档里没有可练习的文字"); return; }
+              startImportedFile(name, paras);
+            })
+            .catch(err => { console.warn("[导入文件] docx 解析失败", err); toast("docx 解析失败，请确认文件未损坏"); });
+          return;
+        }
+        const text = decodeTextBuffer(buf);
+        const clean = ext === "md" ? cleanMarkdown(text) : text;
+        const paras = splitImportedParagraphs(clean);
+        if (!paras.length) { toast("文件里没有可练习的文字"); return; }
+        startImportedFile(name, paras);
+      } catch (e) {
+        console.warn("[导入文件] 解析失败", e);
+        toast("文件解析失败");
+      }
+    };
+    reader.onerror = () => toast("文件读取失败");
+    reader.readAsArrayBuffer(file);
+  }
+
   function restartLast() {
     const src = A.lastSource;
     if (!src || !src.paragraphs || !src.paragraphs.length) return;
@@ -1054,6 +1182,12 @@
   $("#btn-art-list").addEventListener("click", exitToList);
   $("#art-finish").addEventListener("click", e => { if (e.target.id === "art-finish") exitToList(); });
   $("#btn-art-custom").addEventListener("click", startCustom);
+  $("#btn-art-import").addEventListener("click", () => { $("#art-file-input").click(); });
+  $("#art-file-input").addEventListener("change", e => {
+    const f = e.target.files && e.target.files[0];
+    if (f) handleImportFile(f);
+    e.target.value = "";
+  });
   $("#art-hint").addEventListener("change", e => {
     settings.hint = e.target.checked;
     lsSet(LS_KEYS.settings, settings);

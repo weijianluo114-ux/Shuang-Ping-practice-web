@@ -358,7 +358,7 @@ footer{max-width:1060px;margin:0 0 0 132px;padding:0 22px 34px;color:var(--muted
 .art-custom-card{margin-top:18px;padding:18px}
 .art-custom-card h3{margin:0 0 10px;font-size:1rem}
 .art-custom-card textarea{width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--bg);color:var(--text);font:inherit;resize:vertical}
-.art-custom-actions{display:flex;justify-content:flex-end;margin-top:10px}
+.art-custom-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-top:10px}
 
 /* 三栏练习布局：两侧控件 + 中间正文 */
 #article-area{display:flex;flex-direction:column;min-height:calc(100vh - 108px);padding:0}

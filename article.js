@@ -134,6 +134,7 @@
     window.scrollTo(0, 0);
     $("#article-setup").hidden = true;
     $("#article-area").hidden = false;
+    document.body.classList.add("art-practice");
     $("#art-finish").hidden = true;
     $("#art-hint").checked = !!settings.hint;
     $("#art-font").value = settings.articleFont || "system";
@@ -602,6 +603,7 @@
     $("#article-area").hidden = true;
     $("#art-finish").hidden = true;
     $("#article-setup").hidden = false;
+    document.body.classList.remove("art-practice");
     renderList();
   }
 
@@ -1127,10 +1129,11 @@
   function onView(name) {
     if (name === "article") {
       if (!A.listRendered) renderList();
-      if (A.active && !A.finished) { resumeArtTimer(); updateLive(); return; }
+      if (A.active && !A.finished) { document.body.classList.add("art-practice"); resumeArtTimer(); updateLive(); return; }
       if (!A.active && !A.finished && !A.session) autoStartArticle();
       return;
     }
+    document.body.classList.remove("art-practice");
     pauseArtTimer();
     if (A.finished) exitToList();
   }

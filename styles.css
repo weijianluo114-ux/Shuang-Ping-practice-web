@@ -423,6 +423,34 @@ footer{max-width:1060px;margin:0 0 0 132px;padding:0 22px 34px;color:var(--muted
 .art-kb .key .letter{font-size:0.75rem}
 .art-kb .key .lab{font-size:0.5625rem;line-height:1.15}
 
+/* ===== 文章练习一屏模式：整页不滚动，正文框内部滚动 ===== */
+body.art-practice{overflow:hidden;height:100vh}
+body.art-practice main{margin:0 0 0 132px;padding:0;height:calc(100vh - var(--tb-h,78px));overflow:hidden}
+body.art-practice #view-article.view{display:flex;flex-direction:column;height:100%;min-height:0;padding:0}
+body.art-practice #article-area{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;padding:8px 0 0}
+body.art-practice .art-layout{flex:1 1 auto;min-height:0;display:flex;flex-direction:row;align-items:stretch;gap:14px;padding:0 12px}
+body.art-practice .art-side{position:static;top:auto;flex:0 0 210px;width:210px;min-height:0;overflow-y:auto;display:flex;flex-direction:column;justify-content:flex-start;gap:12px}
+body.art-practice .art-side.right{flex:0 0 180px;width:180px;align-items:flex-end}
+body.art-practice .art-center{flex:1 1 auto;min-width:0;min-height:0;max-width:none;margin:0;display:flex;flex-direction:column;gap:10px}
+body.art-practice .art-speed{flex:none;height:88px}
+body.art-practice .art-text{flex:1 1 auto;min-height:100px;height:auto;overflow-y:auto;overflow-x:hidden;scrollbar-width:thin}
+body.art-practice .art-text::-webkit-scrollbar{width:8px}
+body.art-practice .art-text::-webkit-scrollbar-thumb{background:var(--line);border-radius:999px}
+body.art-practice .art-bottom{flex:none;margin-top:8px;padding:0 12px 10px}
+@media (max-width:860px){
+  body.art-practice .art-layout{flex-direction:column;align-items:stretch;padding:0 10px;gap:8px}
+  body.art-practice .art-side{flex:none;width:auto;flex-direction:row;flex-wrap:wrap;align-items:center;overflow:visible;gap:10px}
+  body.art-practice .art-side.right{flex:none;width:auto;justify-content:flex-end}
+  body.art-practice .art-center{flex:1 1 auto}
+}
+@media (max-width:720px){
+  body.art-practice main{margin-left:0;height:calc(100vh - var(--tb-h,120px))}
+}
+@media (max-height:680px){
+  body.art-practice .art-speed{height:64px}
+  body.art-practice .art-kb{display:none}
+}
+
 .art-finish-title{text-align:center;color:var(--muted);font-size:0.875rem;margin:-6px 0 10px}
 .sp-toast{position:fixed;left:50%;bottom:34px;transform:translateX(-50%) translateY(20px);background:#23261F;color:#fff;padding:10px 18px;border-radius:999px;font-size:0.875rem;opacity:0;pointer-events:none;transition:.25s;z-index:99;max-width:80vw}
 .sp-toast.show{opacity:.96;transform:translateX(-50%) translateY(0)}

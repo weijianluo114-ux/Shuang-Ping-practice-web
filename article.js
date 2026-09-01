@@ -38,6 +38,8 @@
     goodWinStart: 0,     // 当前 DOM 窗口第一句在 good.pool 中的下标
     goodRemovedChars: 0, // 已从窗口头部删除的字符总数（用于把窗口内 curIdx 换算成绝对下标）
     goodDoneBase: 0,     // 已从窗口删除的已完成字数（用于进度条累计）
+    goodSegItems: 0,     // 好词好句当前批次的起始完成字数（用于按批记录速度）
+    goodSegMs: 0,        // 好词好句当前批次的起始用时（用于按批记录速度）
     instantScroll: false,// 好词好句滑动窗口时跳过滚动动画，直接定位
     autoStarted: false,  // 是否已做过启动自动开文
     speeds: [],          // 每字瞬时速度采样（字/分）
@@ -129,6 +131,7 @@
     A.active = true; A.finished = false; A.started = false;
     A.stats = { correct: 0, wrong: 0, itemsDone: 0, bestCombo: 0, combo: 0, wrongKeys: {} };
     A.goodMerged = null;
+    A.goodSegItems = 0; A.goodSegMs = 0;
     A.speeds = []; A.speedWrong = []; A.lastCharTime = 0;
     resetArtTimer();
     window.scrollTo(0, 0);
@@ -917,8 +920,13 @@
     const ks = A.stats.correct + A.stats.wrong;
     const acc = ks ? Math.round(A.stats.correct / ks * 100) : 100;
     const speed = Math.round(A.stats.itemsDone / Math.max(elapsed / 60000, 0.01));
-    if (A.goodMode) goodMergeStats(); else mergeRoundIntoStats(A.stats, elapsed);
-    if (typeof recordArticleDaily === "function") recordArticleDaily(A.stats.itemsDone, elapsed);
+    if (A.goodMode) {
+      goodMergeStats();
+      recordGoodSeg();
+    } else {
+      mergeRoundIntoStats(A.stats, elapsed);
+      if (typeof recordArticleDaily === "function") recordArticleDaily(A.stats.itemsDone, elapsed);
+    }
     if (A.articleId) {
       markDone(A.articleId);
       A.articleId = null;
@@ -944,7 +952,9 @@
     if (A.active && !A.finished) {
       goodFlushTime();
       saveProgress();
-      if (A.stats && A.stats.itemsDone > 0) {
+      if (A.goodMode) {
+        recordGoodSeg();
+      } else if (A.stats && A.stats.itemsDone > 0) {
         const ms = artElapsed();
         if (typeof recordArticleDaily === "function") recordArticleDaily(A.stats.itemsDone, ms);
       }
@@ -1006,12 +1016,26 @@
       goodLoad().timeMs += artElapsed();
     }
   }
+  /* 记录好词好句当前批次的练习速度：按批写入文章速度趋势，让今天的曲线点
+     跟随最近一批的速度变化，而不是只在退出时用整场平均记录一次。 */
+  function recordGoodSeg() {
+    if (!A.goodMode || !A.stats) return;
+    const items = A.stats.itemsDone - A.goodSegItems;
+    const ms = Math.max(0, artElapsed() - A.goodSegMs);
+    if (items > 0 && ms > 0 && typeof recordArticleDaily === "function") {
+      recordArticleDaily(items, ms);
+    }
+    A.goodSegItems = A.stats.itemsDone;
+    A.goodSegMs = artElapsed();
+  }
   function goodRecordSentence(g) {
     goodLoad().total += 1;
     goodSave();
     goodMergeStats();
     const poolLen = A.good.pool ? A.good.pool.length : 0;
     if (poolLen && g >= poolLen - 4) goodPrefetch();
+    // 每练完 10 句（一批）记录一次该批速度，避免统计曲线只反映整场平均
+    if ((g + 1) % 10 === 0) recordGoodSeg();
   }
   /* 好词好句无限续练没有“完成”节点：按增量把当前 session 的统计并入全局，
      避免整段 session 只在 finish 时合并导致错键分布等累计丢失。 */
@@ -1460,9 +1484,13 @@
     const src = A.lastSource;
     if (!src || !src.paragraphs || !src.paragraphs.length) return;
     goodFlushTime();
-    if (A.active && !A.finished && A.stats && A.stats.itemsDone > 0) {
-      const ms = artElapsed();
-      if (typeof recordArticleDaily === "function") recordArticleDaily(A.stats.itemsDone, ms);
+    if (A.active && !A.finished) {
+      if (A.goodMode) {
+        recordGoodSeg();
+      } else if (A.stats && A.stats.itemsDone > 0) {
+        const ms = artElapsed();
+        if (typeof recordArticleDaily === "function") recordArticleDaily(A.stats.itemsDone, ms);
+      }
     }
     if (A.goodMode && A.active && !A.finished) goodMergeStats();
     A.articleId = A.lastSourceId || null;
@@ -1586,8 +1614,9 @@
       goodFlushTime();
       goodSave();
       goodMergeStats();
+      recordGoodSeg();
     }
-    if (A.active && !A.finished && A.stats && A.stats.itemsDone > 0) {
+    if (!A.goodMode && A.active && !A.finished && A.stats && A.stats.itemsDone > 0) {
       const ms = artElapsed();
       if (typeof recordArticleDaily === "function") recordArticleDaily(A.stats.itemsDone, ms);
     }

@@ -771,14 +771,16 @@ function mergeRoundIntoStats(rs, elapsedMs) {
   st.days[day].timeMs += elapsedMs;
   lsSet(LS_KEYS.stats, st);
 }
-/* 按日记录文章练习最近一次片段的速度（article.js 调用）：
-   同一天覆盖为最新一次练习片段，让统计曲线跟随最近状态变化，
-   而不是被当天的累计平均值锁死。 */
+/* 按日累计文章练习字数与有效练习时长（article.js 调用）：
+   article.js 传进来的 timeMs 是“击键时才计、停顿超过 3 秒自动暂停”的有效练习时间，
+   好词好句每 5 句记录一次该 5 句的增量，普通文章在完成/退出时记录。 */
 function recordArticleDaily(itemsDone, timeMs) {
   if (!itemsDone || itemsDone <= 0 || !timeMs || timeMs <= 0) return;
   const data = lsGet(LS_KEYS.articleDaily, {});
   const day = todayStr();
-  data[day] = { items: itemsDone, timeMs: timeMs };
+  if (!data[day]) data[day] = { items: 0, timeMs: 0 };
+  data[day].items += itemsDone;
+  data[day].timeMs += timeMs;
   lsSet(LS_KEYS.articleDaily, data);
 }
 function dateKeyOf(d) {

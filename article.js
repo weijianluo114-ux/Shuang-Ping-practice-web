@@ -47,6 +47,7 @@
     timerBase: 0,
     timerStart: null,
     timerIv: null,
+    idleT: 0,            // 击键空闲看门狗：停顿超过 3 秒即暂停计时
   };
 
   /* ---------- 小工具 ---------- */
@@ -63,14 +64,20 @@
     toastT = setTimeout(() => toastEl.classList.remove("show"), 2400);
   }
 
-  /* ---------- 计时 ---------- */
+  /* ---------- 计时 ----------
+     计时只在“文章页 + 会话进行中 + 用户在击键”时走：
+     startIfNeeded 在每次击键/退格时刷新 3 秒空闲看门狗，停顿超时即暂停，
+     离开文章页也会暂停；回到文章页不会自动恢复，下一次击键才继续计时。
+     这样累计进统计的时长是有效练习时间，发呆/看弹窗/切走页面都不计时。 */
+  const ART_IDLE_PAUSE_MS = 3000;
   function artElapsed() { return A.timerBase + (A.timerStart ? Date.now() - A.timerStart : 0); }
   function pauseArtTimer() {
     if (A.timerStart !== null) { A.timerBase += Date.now() - A.timerStart; A.timerStart = null; }
     if (A.timerIv) { clearInterval(A.timerIv); A.timerIv = null; }
+    if (A.idleT) { clearTimeout(A.idleT); A.idleT = 0; }
   }
   function resumeArtTimer() {
-    if (A.timerStart !== null || !A.active || A.finished || !A.started) return;
+    if (currentView !== "article" || A.timerStart !== null || !A.active || A.finished || !A.started) return;
     A.timerStart = Date.now();
     if (A.timerIv) clearInterval(A.timerIv);
     A.timerIv = setInterval(() => {
@@ -79,7 +86,14 @@
   }
   function resetArtTimer() { pauseArtTimer(); A.timerBase = 0; }
   function startIfNeeded() {
-    if (!A.started) { A.started = true; resumeArtTimer(); }
+    if (!A.started) A.started = true;
+    if (currentView !== "article" || !A.active || A.finished) return;
+    resumeArtTimer();
+    if (A.idleT) clearTimeout(A.idleT);
+    A.idleT = setTimeout(() => {
+      A.idleT = 0;
+      if (currentView === "article" && A.active && !A.finished) pauseArtTimer();
+    }, ART_IDLE_PAUSE_MS);
   }
 
   /* ---------- 拼音/转码 ---------- */
@@ -1016,8 +1030,8 @@
       goodLoad().timeMs += artElapsed();
     }
   }
-  /* 记录好词好句当前批次的练习速度：按批写入文章速度趋势，让今天的曲线点
-     跟随最近一批的速度变化，而不是只在退出时用整场平均记录一次。 */
+  /* 记录好词好句当前片段的练习增量：每 5 句记录一次这 5 句的字数与有效练习时长，
+     退出/关页时再记录不足 5 句的剩余片段，避免重复累计。 */
   function recordGoodSeg() {
     if (!A.goodMode || !A.stats) return;
     const items = A.stats.itemsDone - A.goodSegItems;
@@ -1034,8 +1048,8 @@
     goodMergeStats();
     const poolLen = A.good.pool ? A.good.pool.length : 0;
     if (poolLen && g >= poolLen - 4) goodPrefetch();
-    // 每练完 10 句（一批）记录一次该批速度，避免统计曲线只反映整场平均
-    if ((g + 1) % 10 === 0) recordGoodSeg();
+    // 每练完 5 句记录一次这 5 句的字数与时长（全天累计，时长只含有效练习时间）
+    if ((g + 1) % 5 === 0) recordGoodSeg();
   }
   /* 好词好句无限续练没有“完成”节点：按增量把当前 session 的统计并入全局，
      避免整段 session 只在 finish 时合并导致错键分布等累计丢失。 */
@@ -1517,7 +1531,7 @@
   function onView(name) {
     if (name === "article") {
       if (!A.listRendered) renderList();
-      if (A.active && !A.finished) { document.body.classList.add("art-practice"); resumeArtTimer(); updateLive(); return; }
+      if (A.active && !A.finished) { document.body.classList.add("art-practice"); updateLive(); return; }
       if (!A.active && !A.finished && !A.session) autoStartArticle();
       return;
     }
@@ -1528,7 +1542,7 @@
   }
   function onKey(e) {
     if (!A.active || A.finished || !A.session) return;
-    if (e.key === "Backspace") { e.preventDefault(); if (G.on) return; stepBack(); return; }
+    if (e.key === "Backspace") { e.preventDefault(); if (G.on) return; startIfNeeded(); stepBack(); return; }
     if (/^[a-zA-Z;]$/.test(e.key)) {
       startIfNeeded();
       const k = e.key.toLowerCase();
@@ -1601,7 +1615,7 @@
   $("#art-game").addEventListener("change", e => {
     if (!A.goodMode) { e.target.checked = false; toast("追逐模式只在好词好句里可用"); return; }
     if (e.target.checked) gameEnter();
-    else { gameExit(); if (A.active && !A.finished) resumeArtTimer(); }
+    else gameExit();
   });
   $("#art-game-diff").addEventListener("change", e => {
     settings.articleGameDiff = e.target.value;

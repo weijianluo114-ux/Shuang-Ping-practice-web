@@ -379,9 +379,49 @@ footer{max-width:1060px;margin:0 0 0 132px;padding:0 22px 34px;color:var(--muted
 .art-side.right .live-stats .chip{width:100%;text-align:right;white-space:nowrap;padding:6px 10px;font-size:0.75rem}
 
 /* 速度曲线 */
-.art-speed{background:var(--card);border:1px solid var(--line);border-radius:14px;height:120px;padding:8px 10px;box-shadow:var(--shadow);overflow:hidden}
+.art-speed{background:var(--card);border:1px solid var(--line);border-radius:14px;height:120px;padding:8px 10px;box-shadow:var(--shadow);overflow:hidden;position:relative}
+#art-speed.game-on{height:190px;padding:0}
 .speed-svg{width:100%;height:100%;display:block}
 .speed-empty{color:var(--muted);font-size:0.75rem;height:100%;display:flex;align-items:center;justify-content:center}
+/* ---------- 好词好句 · 追逐小游戏 ---------- */
+.game{position:absolute;inset:0;font-size:14px}
+.game-scene{position:absolute;inset:0;overflow:hidden;border-radius:12px;background:linear-gradient(#D8EFFF 0%,#EFF8FF 72%,#E9DCC3 72%)}
+.game-sky{position:absolute;left:0;right:0;top:0;bottom:28px;overflow:hidden}
+.game-wall{position:absolute;left:0;top:0;bottom:0;width:9px;background:linear-gradient(90deg,rgba(255,75,75,.9),rgba(255,75,75,0));opacity:.35;transition:opacity .18s}
+.game-wall.danger{opacity:.95}
+.game-floor{position:absolute;left:0;right:0;bottom:0;height:28px;overflow:hidden}
+.game-floor .strip{position:absolute;left:0;top:0;width:100%;height:28px;background:repeating-linear-gradient(90deg,#EADEC4 0 26px,#DCCFAF 26px 52px);border-top:2px solid #CBB98D;will-change:transform}
+.game-floor .strip.b{left:100%}
+.game-char{position:absolute;left:0;bottom:26px;font-size:24px;line-height:1;transform:translate3d(0,0,0) scaleX(-1);will-change:transform;z-index:3}
+.game-bubble{position:absolute;left:0;bottom:54px;display:flex;align-items:center;gap:5px;background:rgba(255,255,255,.94);border:1px solid var(--line);border-radius:10px;padding:2px 8px;box-shadow:var(--shadow);will-change:transform;z-index:4;transition:border-color .15s}
+.game-bubble.bad{border-color:var(--bad)}
+.game-bubble .gb-char{font-size:15px;font-weight:800;color:#111}
+.game-bubble .gb-code{font-family:ui-monospace,Consolas,Menlo,monospace;font-size:12px;color:var(--muted)}
+.game-bubble .gb-code em{font-style:normal;padding:0 1px}
+.game-bubble .gb-code em.hit{color:var(--accent);font-weight:800}
+.game-hud{position:absolute;left:10px;right:10px;top:6px;display:flex;gap:8px;align-items:center;font-size:12px;color:#3A3F36;z-index:5;pointer-events:none}
+.game-hud .hp{letter-spacing:1px;font-size:13px}
+.game-hud .score{margin-left:auto;font-weight:800}
+.cloud{position:absolute;left:0;top:0;font-size:19px;opacity:.75;will-change:transform;z-index:1}
+.heart{position:absolute;left:0;top:0;font-size:17px;line-height:1;will-change:transform;z-index:2}
+.game-ready,.game-over,.game-board{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;text-align:center;border-radius:12px;z-index:6}
+.game-ready{background:rgba(255,255,255,.66);color:#3A3F36}
+.game-ready b{font-size:15px}
+.game-ready small{font-size:11px;color:var(--muted)}
+.game-over{background:rgba(35,38,31,.6);color:#fff}
+.game-over .go-score{font-size:13px}
+.game-btns{display:flex;gap:8px;margin-top:4px}
+.game-btns .btn{padding:6px 12px;font-size:12px}
+.game-board{background:rgba(255,255,255,.94);color:#23261F;padding:12px;justify-content:flex-start;gap:8px}
+.game-board b{font-size:13px}
+.game-board ul{list-style:none;margin:0;padding:0;width:100%;overflow:auto;flex:1}
+.game-board li{display:flex;gap:10px;justify-content:space-between;font-size:12px;padding:4px 6px;border-bottom:1px dashed var(--line)}
+.game-board li span{color:var(--muted)}
+.game-board li b{color:var(--accent)}
+.game-board li.empty{justify-content:center;border:none;color:var(--muted)}
+.game-scene.shake{animation:gameShake .25s}
+@keyframes gameShake{0%,100%{transform:translateX(0)}25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
+
 
 /* 正文：护眼纸色背景，固定两行窗口（当前行居中，整段可滑动） */
 .art-text{

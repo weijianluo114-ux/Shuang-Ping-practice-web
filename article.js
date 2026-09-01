@@ -13,7 +13,7 @@
   }
 
   const HAN = /[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]/;
-  const A_LS = { progress: "sp_article_progress_v1", done: "sp_article_done_v1", good: "sp_good_v1", mode: "sp_article_mode_v1" };
+  const A_LS = { progress: "sp_article_progress_v1", done: "sp_article_done_v1", good: "sp_good_v1", mode: "sp_article_mode_v1", game: "sp_game_v1" };
 
   const A = {
     session: null,       // { title, byline, groups:[[char...]], flat:[char...] }
@@ -139,6 +139,10 @@
     $("#art-hint").checked = !!settings.hint;
     $("#art-font").value = settings.articleFont || "system";
     $("#art-bold").checked = !!settings.articleBold;
+    const gameRow = $("#art-game-row");
+    if (gameRow) gameRow.hidden = !A.goodMode;
+    if (!A.goodMode && G.on) gameExit();
+    if (A.goodMode && G.on) gameReset(true);
     if (typeof applyArticleFont === "function") applyArticleFont();
     $("#art-title").innerHTML = escapeHtml(title) + (byline ? ` <small>· ${escapeHtml(byline)}</small>` : "");
     renderText();
@@ -378,7 +382,7 @@
   }
   function updateSpeedChart() {
     const el = $("#art-speed");
-    if (!el) return;
+    if (!el || G.on) return;
     const data = A.speeds.slice(-60);
     if (!data.length) {
       el.innerHTML = `<div class="speed-empty">开始输入后，这里会显示每字速度曲线（越快越高）</div>`;
@@ -429,6 +433,305 @@
     A.speedWrong.push(!!wrong);
     if (A.speeds.length > 80) { A.speeds.shift(); A.speedWrong.shift(); }
     updateSpeedChart();
+  }
+
+  /* ---------- 好词好句 · 追逐小游戏 ---------- */
+  const GAME = {
+    BASE: 52,        // 初始场景后退速度 px/s
+    ACCEL: 3.2,      // 每秒提速 px/s^2
+    MAX: 290,        // 最高速度
+    PUSH_LETTER: 15, // 每敲对一个键，角色向前推进 px
+    PUSH_CHAR: 24,   // 每完成一个字，额外推进 px
+    HEART_EVERY: 6.5,// 每隔多少秒刷新一颗心
+    HP_MAX: 3,
+  };
+  const G = {
+    on: false, playing: false, ready: false, over: false,
+    x: 64, hp: GAME.HP_MAX, inv: 0, dist: 0, speed: 0, elapsed: 0,
+    lastTs: 0, raf: 0, spawnT: 0, boxW: 300, boxH: 120,
+    clouds: [], hearts: [], el: null,
+  };
+
+  function gameLoadScores() {
+    const o = lsGet(A_LS.game, { scores: [] });
+    return Array.isArray(o.scores) ? o.scores : [];
+  }
+  function gameSaveScore(score) {
+    const arr = gameLoadScores();
+    arr.push({ score: Math.max(0, score | 0), ts: Date.now() });
+    arr.sort((a, b) => b.score - a.score || b.ts - a.ts);
+    lsSet(A_LS.game, { scores: arr.slice(0, 10) });
+  }
+  function gameFmtTs(ts) {
+    const d = new Date(ts);
+    return String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0") + " " + String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
+  }
+  function gameBuild() {
+    if (document.getElementById("art-game-el")) return;
+    const host = $("#art-speed");
+    host.innerHTML = `
+      <div class="game" id="art-game-el">
+        <div class="game-scene" id="game-scene">
+          <div class="game-sky" id="game-sky"></div>
+          <div class="game-wall" id="game-wall"></div>
+          <div class="game-floor" id="game-floor">
+            <span class="strip a" id="game-floor-a"></span>
+            <span class="strip b" id="game-floor-b"></span>
+          </div>
+          <div class="game-char" id="game-char">🏃</div>
+          <div class="game-bubble" id="game-bubble"><b class="gb-char" id="game-bubble-char">字</b><span class="gb-code" id="game-bubble-code"></span></div>
+          <div class="game-hud">
+            <span class="hp" id="game-hp"></span>
+            <span class="gv" id="game-v">1.0x</span>
+            <span class="score" id="game-score">0 分</span>
+          </div>
+          <div class="game-ready" id="game-ready"><b>追逐模式</b><small>输入法保持英文 · 打字即开始</small></div>
+          <div class="game-over" id="game-over" hidden>
+            <b>游戏结束</b>
+            <span>得分 <b id="game-over-score">0</b></span>
+            <div class="game-btns">
+              <button class="btn primary" id="game-again">再来一局</button>
+              <button class="btn ghost" id="game-board-btn">🏆 排行榜</button>
+            </div>
+          </div>
+          <div class="game-board" id="game-board" hidden>
+            <b>🏆 最高 10 个分数</b>
+            <ul id="game-board-list"></ul>
+            <button class="btn ghost" id="game-board-close">关闭</button>
+          </div>
+        </div>
+      </div>`;
+    for (let i = 0; i < 3; i++) {
+      const el = document.createElement("span");
+      el.className = "cloud"; el.textContent = "☁️"; el.hidden = true;
+      $("#game-sky").appendChild(el);
+      G.clouds.push({ el, x: 0, y: 0 });
+    }
+    for (let i = 0; i < 2; i++) {
+      const el = document.createElement("span");
+      el.className = "heart"; el.textContent = "💖"; el.hidden = true;
+      $("#game-sky").appendChild(el);
+      G.hearts.push({ el, x: 0, y: 0, on: false });
+    }
+    G.el = {
+      scene: $("#game-scene"), wall: $("#game-wall"),
+      floorA: $("#game-floor-a"), floorB: $("#game-floor-b"),
+      char: $("#game-char"), bubble: $("#game-bubble"),
+      bubbleChar: $("#game-bubble-char"), bubbleCode: $("#game-bubble-code"),
+      hp: $("#game-hp"), score: $("#game-score"), v: $("#game-v"),
+      ready: $("#game-ready"), over: $("#game-over"), overScore: $("#game-over-score"),
+      board: $("#game-board"), boardList: $("#game-board-list"),
+    };
+    $("#game-again").addEventListener("click", () => gameReset(true));
+    $("#game-board-btn").addEventListener("click", gameShowBoard);
+    $("#game-board-close").addEventListener("click", () => { G.el.board.hidden = true; });
+  }
+  function gameStopLoop() {
+    if (G.raf) { cancelAnimationFrame(G.raf); G.raf = 0; }
+    G.playing = false;
+  }
+  function gameMeasure() {
+    const scene = G.el && G.el.scene;
+    if (scene) {
+      G.boxW = Math.max(scene.clientWidth, 80);
+      G.boxH = Math.max(scene.clientHeight, 80);
+    }
+  }
+  function gameSyncTransforms() {
+    if (!G.el) return;
+    const off = G.dist % G.boxW;
+    G.el.floorA.style.transform = `translate3d(${-off}px,0,0)`;
+    G.el.floorB.style.transform = `translate3d(${G.boxW - off}px,0,0)`;
+    G.el.char.style.transform = `translate3d(${G.x}px,0,0) scaleX(-1)`;
+    G.el.bubble.style.transform = `translate3d(${G.x}px,0,0)`;
+    G.el.wall.classList.toggle("danger", G.x < 36 && G.playing);
+  }
+  function gameUpdateHud() {
+    if (!G.el) return;
+    const hp = Math.max(0, G.hp), empty = Math.max(0, GAME.HP_MAX - hp);
+    G.el.hp.textContent = "❤️".repeat(hp) + "🖤".repeat(empty);
+    G.el.score.textContent = Math.floor(G.dist / 10) + " 分";
+    G.el.v.textContent = (G.speed / GAME.BASE).toFixed(1) + "x";
+  }
+  function gameRenderBubble(bad) {
+    if (!G.el) return;
+    const c = A.session && A.session.flat ? A.session.flat[A.curIdx] : null;
+    G.el.bubbleChar.textContent = c ? c.ch : "✓";
+    G.el.bubbleCode.innerHTML = c && c.code ? Array.from(c.code).map((k, j) =>
+      `<em class="${j < c.typedLen ? "hit" : ""}">${escapeHtml(k)}</em>`).join("") : "";
+    G.el.bubble.classList.toggle("bad", !!bad);
+    if (bad) {
+      clearTimeout(gameBubbleT);
+      gameBubbleT = setTimeout(() => G.el && G.el.bubble.classList.remove("bad"), 180);
+    }
+  }
+  let gameBubbleT = 0;
+  function gameReset(showReady) {
+    gameStopLoop();
+    gameMeasure();
+    G.ready = !!showReady;
+    G.over = false;
+    G.x = 64; G.hp = GAME.HP_MAX; G.inv = 0;
+    G.dist = 0; G.speed = 0; G.elapsed = 0;
+    G.spawnT = GAME.HEART_EVERY * 0.6;
+    G.clouds.forEach((c, i) => {
+      c.el.hidden = false;
+      c.x = 40 + i * (G.boxW / 3) + Math.random() * 50;
+      c.y = 8 + Math.random() * G.boxH * 0.35;
+      c.el.style.top = c.y + "px";
+      c.el.style.transform = `translate3d(${c.x}px,0,0)`;
+    });
+    G.hearts.forEach(h => { h.on = false; h.el.hidden = true; });
+    if (G.el) {
+      G.el.ready.hidden = !G.ready;
+      G.el.over.hidden = true;
+      G.el.board.hidden = true;
+      G.el.wall.classList.remove("danger");
+    }
+    gameRenderBubble(false);
+    gameUpdateHud();
+    gameSyncTransforms();
+  }
+  function gameStart() {
+    if (!G.on) return;
+    G.playing = true; G.ready = false; G.over = false;
+    G.lastTs = performance.now();
+    if (G.el) G.el.ready.hidden = true;
+    gameLoop(performance.now());
+  }
+  function gameHitWall() {
+    if (G.inv > 0 || G.over || !G.playing) return;
+    G.hp--;
+    G.inv = 1.2;
+    G.x = 44;
+    gameUpdateHud();
+    if (G.el && G.el.scene) {
+      G.el.scene.classList.remove("shake");
+      void G.el.scene.offsetWidth;
+      G.el.scene.classList.add("shake");
+    }
+    if (G.hp <= 0) gameOver();
+  }
+  function gameOver() {
+    if (!G.on) return;
+    G.playing = false; G.over = true;
+    gameStopLoop();
+    gameSaveScore(Math.floor(G.dist / 10));
+    if (G.el) {
+      G.el.overScore.textContent = Math.floor(G.dist / 10);
+      G.el.over.hidden = false;
+    }
+    // 重置场景：世界归零、角色回位、心与云复位
+    G.dist = 0; G.speed = 0; G.elapsed = 0; G.x = 64; G.inv = 0;
+    G.clouds.forEach((c, i) => {
+      c.x = 40 + i * (G.boxW / 3);
+      c.y = 8 + Math.random() * G.boxH * 0.35;
+      c.el.style.top = c.y + "px";
+      c.el.style.transform = `translate3d(${c.x}px,0,0)`;
+    });
+    G.hearts.forEach(h => { h.on = false; h.el.hidden = true; });
+    gameSyncTransforms();
+    gameUpdateHud();
+  }
+  function gameShowBoard() {
+    if (!G.el) return;
+    const arr = gameLoadScores();
+    G.el.boardList.innerHTML = arr.length
+      ? arr.map((s, i) => `<li><span>#${i + 1}</span><b>${s.score}</b><span>${gameFmtTs(s.ts)}</span></li>`).join("")
+      : `<li class="empty">还没有成绩记录</li>`;
+    G.el.board.hidden = false;
+  }
+  function gameSpawnHeart() {
+    if (!G.el) return;
+    const h = G.hearts.find(x => !x.on);
+    if (!h) return;
+    h.on = true;
+    h.x = G.boxW + 6;
+    h.y = 18 + Math.random() * Math.max(10, G.boxH * 0.45);
+    h.el.hidden = false;
+    h.el.style.top = h.y + "px";
+    h.el.style.transform = `translate3d(${h.x}px,0,0)`;
+  }
+  function gameLoop(now) {
+    if (!G.on || !G.playing) return;
+    let dt = (now - G.lastTs) / 1000;
+    G.lastTs = now;
+    if (!(dt > 0)) dt = 0.016;
+    if (dt > 0.05) dt = 0.05;
+    G.elapsed += dt;
+    G.speed = Math.min(GAME.MAX, GAME.BASE + G.elapsed * GAME.ACCEL);
+    G.dist += G.speed * dt;
+    G.x -= G.speed * dt;
+    if (G.inv > 0) G.inv -= dt;
+    if (G.x <= 0) gameHitWall();
+    G.x = Math.max(0, Math.min(G.x, G.boxW - 30));
+    // 心心刷新与回收
+    G.spawnT -= dt;
+    if (G.spawnT <= 0) { G.spawnT = GAME.HEART_EVERY; gameSpawnHeart(); }
+    for (const h of G.hearts) {
+      if (!h.on) continue;
+      h.x -= G.speed * dt;
+      if (h.x < -24) { h.on = false; h.el.hidden = true; continue; }
+      if (h.x < G.x + 28 && h.x + 18 > G.x && Math.abs((h.y + 9) - (G.boxH - 30)) < 26) {
+        h.on = false; h.el.hidden = true;
+        if (G.hp < GAME.HP_MAX) { G.hp++; gameUpdateHud(); }
+      }
+      h.el.style.transform = `translate3d(${h.x}px,0,0)`;
+    }
+    // 云朵视差（更慢），循环回收
+    for (const c of G.clouds) {
+      c.x -= G.speed * 0.22 * dt;
+      if (c.x < -90) {
+        c.x = G.boxW + 20 + Math.random() * 120;
+        c.y = 6 + Math.random() * G.boxH * 0.4;
+        c.el.style.top = c.y + "px";
+      }
+      c.el.style.transform = `translate3d(${c.x}px,0,0)`;
+    }
+    gameSyncTransforms();
+    gameUpdateHud();
+    G.raf = requestAnimationFrame(gameLoop);
+  }
+  function gameEnter() {
+    if (!A.goodMode || !A.session) {
+      const cb = $("#art-game");
+      if (cb) cb.checked = false;
+      return;
+    }
+    gameBuild();
+    G.on = true;
+    $("#art-speed").classList.add("game-on");
+    gameReset(true);
+  }
+  function gameExit() {
+    if (G.on) { gameStopLoop(); G.on = false; }
+    const el = document.getElementById("art-game-el");
+    if (el) el.remove();
+    G.clouds = []; G.hearts = []; G.el = null;
+    $("#art-speed").classList.remove("game-on");
+    if ($("#art-speed")) updateSpeedChart();
+  }
+  function gameKey(k) {
+    if (!G.on || !A.session || A.finished) return;
+    if (G.over) return;
+    const c = A.session.flat[A.curIdx];
+    if (!c) return;
+    if (!G.playing) { if (G.ready) gameStart(); }
+    if (!G.playing) return;
+    const prevIdx = A.curIdx;
+    const correct = k === c.code[c.typedLen];
+    handleType(k);
+    if (correct) {
+      G.x += GAME.PUSH_LETTER;
+      if (A.curIdx !== prevIdx) G.x += GAME.PUSH_CHAR;
+      G.x = Math.max(0, Math.min(G.x, G.boxW - 30));
+      gameRenderBubble(false);
+    } else {
+      gameRenderBubble(true);
+    }
+    gameUpdateHud();
+    gameSyncTransforms();
+    if (A.finished) gameExit();
   }
 
   /* ---------- 击键 ---------- */
@@ -593,6 +896,7 @@
     }
     A.active = false; A.finished = false; A.started = false;
     A.goodMode = false;
+    gameExit();
     A.goodPrefetching = false;
     A.goodWinStart = 0;
     A.goodRemovedChars = 0;
@@ -1135,15 +1439,17 @@
     }
     document.body.classList.remove("art-practice");
     pauseArtTimer();
+    if (G.on) gameExit();
     if (A.finished) exitToList();
   }
   function onKey(e) {
     if (!A.active || A.finished || !A.session) return;
-    if (e.key === "Backspace") { e.preventDefault(); stepBack(); return; }
+    if (e.key === "Backspace") { e.preventDefault(); if (G.on) return; stepBack(); return; }
     if (/^[a-zA-Z;]$/.test(e.key)) {
       startIfNeeded();
-      handleType(e.key.toLowerCase());
-      if (typeof flashArtKey === "function") flashArtKey(e.key.toLowerCase());
+      const k = e.key.toLowerCase();
+      if (G.on) gameKey(k); else handleType(k);
+      if (typeof flashArtKey === "function") flashArtKey(k);
     }
   }
   function onEscape() {
@@ -1207,6 +1513,10 @@
     lsSet(LS_KEYS.settings, settings);
     if (typeof applyArticleFont === "function") applyArticleFont();
     if (A.session) positionArtText();
+  });
+  $("#art-game").addEventListener("change", e => {
+    if (!A.goodMode) { e.target.checked = false; toast("追逐模式只在好词好句里可用"); return; }
+    if (e.target.checked) gameEnter(); else gameExit();
   });
 
   window.addEventListener("beforeunload", () => {

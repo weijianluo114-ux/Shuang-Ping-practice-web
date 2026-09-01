@@ -449,30 +449,22 @@ footer{max-width:1060px;margin:0 0 0 132px;padding:0 22px 34px;color:var(--muted
 .ac.pop::after{content:"";position:absolute;inset:-1px;border-radius:inherit;border:2px solid var(--celebrate,var(--ok));pointer-events:none;animation:artRipple .5s ease-out forwards}
 @keyframes artPop{0%{transform:scale(1)}30%{transform:scale(var(--pop-scale,1.14))}100%{transform:scale(1)}}
 @keyframes artRipple{0%{opacity:.95;transform:scale(1)}100%{opacity:0;transform:scale(var(--ripple-scale,1.7))}}
-.ac.lvl0{--celebrate:#8FD694;--pop-scale:1.08;--ripple-scale:1.40}
-.ac.lvl1{--celebrate:#4CAF50;--pop-scale:1.12;--ripple-scale:1.60}
-.ac.lvl2{--celebrate:#00B8A9;--pop-scale:1.16;--ripple-scale:1.80}
-.ac.lvl3{--celebrate:#FF6EC7;--pop-scale:1.20;--ripple-scale:2.00}
-.ac.lvl4{--celebrate:#FFD700;--pop-scale:1.24;--ripple-scale:2.20}
-.ac.lvl0 .hz{color:#8FD694}
-.ac.lvl1 .hz{color:#4CAF50}
-.ac.lvl2 .hz{color:#00B8A9}
-.ac.lvl3 .hz{
-  background:linear-gradient(90deg,#ff6ec7,#ff9a3d,#ffe14d,#4dd0e1,#7c4dff);
-  -webkit-background-clip:text;background-clip:text;
-  -webkit-text-fill-color:transparent;color:transparent;
-  animation:artHue 2.5s linear infinite;
-}
-.ac.lvl4 .hz{
-  background:linear-gradient(180deg,#fffbe6 0%,#ffe45c 45%,#ffb300 70%,#fff3b0 100%);
-  -webkit-background-clip:text;background-clip:text;
-  -webkit-text-fill-color:transparent;color:transparent;
-  animation:artGoldGlow 1.5s ease-in-out infinite;
-}
-@keyframes artHue{to{filter:hue-rotate(360deg)}}
+/* 正反馈色阶参考经典游戏稀有度梯度（Diablo 1996 开创 / WoW 等发扬）：
+   绿 uncommon → 蓝 rare → 紫 legendary → 橙 epic → 金 mythic。
+   纯色高对比，适配护眼纸 #F7F2E7，避免彩虹闪烁与渐变糊字。 */
+.ac.lvl0{--celebrate:#1E7A36;--pop-scale:1.08;--ripple-scale:1.40}
+.ac.lvl1{--celebrate:#1557B0;--pop-scale:1.12;--ripple-scale:1.60}
+.ac.lvl2{--celebrate:#7B2E9E;--pop-scale:1.16;--ripple-scale:1.80}
+.ac.lvl3{--celebrate:#B84800;--pop-scale:1.20;--ripple-scale:2.00}
+.ac.lvl4{--celebrate:#8F6200;--pop-scale:1.24;--ripple-scale:2.20}
+.ac.lvl0 .hz{color:#1E7A36}
+.ac.lvl1 .hz{color:#1557B0}
+.ac.lvl2 .hz{color:#7B2E9E}
+.ac.lvl3 .hz{color:#B84800;font-weight:700}
+.ac.lvl4 .hz{color:#8F6200;font-weight:800;animation:artGoldGlow 1.6s ease-in-out infinite}
 @keyframes artGoldGlow{
-  0%,100%{filter:drop-shadow(0 0 2px rgba(255,200,0,.6)) brightness(1)}
-  50%{filter:drop-shadow(0 0 7px rgba(255,215,0,1)) brightness(1.15)}
+  0%,100%{text-shadow:0 0 5px rgba(212,160,23,.35);filter:brightness(1)}
+  50%{text-shadow:0 0 9px rgba(230,180,40,.6);filter:brightness(1.06)}
 }
 .ac[data-errs="1"] .hz{color:#EF5350}
 .ac[data-errs="2"] .hz{color:#E53935}

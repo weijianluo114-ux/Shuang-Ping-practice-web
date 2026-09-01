@@ -470,19 +470,6 @@ footer{max-width:1060px;margin:0 0 0 132px;padding:0 22px 34px;color:var(--muted
   0%,100%{text-shadow:0 0 5px rgba(212,160,23,.45),0 0 10px rgba(255,120,0,.18);filter:brightness(1)}
   50%{text-shadow:0 0 9px rgba(255,190,40,.9),0 0 18px rgba(255,140,0,.45);filter:brightness(1.1)}
 }
-/* 连续打对时，前面已打对的字开始燃烧：小火苗在字角跳动，等级越高火苗越大 */
-.ac.burn .hz{position:relative}
-.ac.burn .hz::after{
-  content:"🔥";position:absolute;top:-0.62em;right:-0.42em;font-size:0.36em;line-height:1;
-  animation:artFlame .55s ease-in-out infinite;transform-origin:bottom center;pointer-events:none;
-}
-.ac.lvl3.burn .hz::after{font-size:0.44em}
-.ac.lvl4.burn .hz::after{font-size:0.50em}
-.ac.lvl5.burn .hz::after{font-size:0.56em}
-@keyframes artFlame{
-  0%,100%{transform:translateY(0) scale(1) rotate(-4deg);opacity:.85}
-  50%{transform:translateY(-2px) scale(1.3) rotate(4deg);opacity:1}
-}
 .ac[data-errs="1"] .hz{color:#EF5350}
 .ac[data-errs="2"] .hz{color:#E53935}
 .ac[data-errs="3"] .hz{color:#C62828}

@@ -130,7 +130,6 @@
     A.stats = { correct: 0, wrong: 0, itemsDone: 0, bestCombo: 0, combo: 0, wrongKeys: {} };
     A.goodMerged = null;
     A.speeds = []; A.speedWrong = []; A.lastCharTime = 0;
-    A.burnApplied = false;
     resetArtTimer();
     window.scrollTo(0, 0);
     $("#article-setup").hidden = true;
@@ -324,26 +323,12 @@
   // 打对整字后的庆祝反馈：只对「字」做轻微弹跳动画（外框不动）。
   // 颜色随连续打对字数（键级 combo 折算为字级）逐级增强，共 6 级：
   // lvl0 绿 → lvl1 蓝 → lvl2 紫 → lvl3 橙 → lvl4 金 → lvl5 炽金（封顶，保持）。
-  // 连续打对时，前面已打对的字会逐渐「燃烧」（小火苗跳动动画）。
   function celebrateChar(c) {
     if (!c || !c.el) return;
     const lvl = Math.max(0, Math.min(5, Math.floor((A.stats.combo || 0) / 2) - 1));
     c.el.classList.remove("pop", "lvl0", "lvl1", "lvl2", "lvl3", "lvl4", "lvl5");
     void c.el.offsetWidth;
     c.el.classList.add("pop", "lvl" + lvl);
-    if (lvl >= 1) {
-      c.el.classList.add("burn");
-      if (!A.burnApplied) {
-        A.burnApplied = true;
-        const s = A.session;
-        if (s) {
-          for (let i = 0; i < A.curIdx; i++) {
-            const x = s.flat[i];
-            if (x.done && x.el && !x.skip) x.el.classList.add("burn");
-          }
-        }
-      }
-    }
   }
 
   /* ---------- 实时统计 / 进度 / 速度曲线 ---------- */
@@ -832,7 +817,6 @@
     } else {
       A.stats.wrong++;
       A.stats.combo = 0;
-      A.burnApplied = false;
       A.stats.wrongKeys[k] = (A.stats.wrongKeys[k] || 0) + 1;
       soundWrong();
       flashErr();
@@ -910,7 +894,7 @@
           clearReveal(c);
         }
         p.done = false; p.typedLen = 0; p.errs = 0; p.wrongRun = 0;
-        if (p.el) p.el.classList.remove("done", "err", "pop", "lvl0", "lvl1", "lvl2", "lvl3", "lvl4", "lvl5", "burn");
+        if (p.el) p.el.classList.remove("done", "err", "pop", "lvl0", "lvl1", "lvl2", "lvl3", "lvl4", "lvl5");
         A.stats.itemsDone = Math.max(0, A.stats.itemsDone - 1);
         A.stats.combo = 0;
         if (A.speeds.length) { A.speeds.pop(); A.speedWrong.pop(); updateSpeedChart(); }

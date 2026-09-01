@@ -140,7 +140,11 @@
     $("#art-font").value = settings.articleFont || "system";
     $("#art-bold").checked = !!settings.articleBold;
     const gameRow = $("#art-game-row");
+    const diffRow = $("#art-game-diff-row");
     if (gameRow) gameRow.hidden = !A.goodMode;
+    if (diffRow) diffRow.hidden = !A.goodMode;
+    const diffSel = $("#art-game-diff");
+    if (diffSel) diffSel.value = settings.articleGameDiff || "hard";
     if (!A.goodMode && G.on) gameExit();
     if (A.goodMode && G.on) gameReset(true);
     if (typeof applyArticleFont === "function") applyArticleFont();
@@ -436,13 +440,18 @@
   }
 
   /* ---------- 好词好句 · 追逐小游戏 ---------- */
+  const GAME_DIFFS = {
+    easy:      { label: "简单", base: 36, accel: 2.0, max: 180, heartEvery: 4.5 },
+    normal:    { label: "普通", base: 44, accel: 2.6, max: 235, heartEvery: 5.5 },
+    hard:      { label: "困难", base: 52, accel: 3.2, max: 290, heartEvery: 6.5 },
+    nightmare: { label: "噩梦", base: 64, accel: 4.0, max: 340, heartEvery: 8.5 },
+  };
+  function gameCfg() {
+    return GAME_DIFFS[settings.articleGameDiff] || GAME_DIFFS.hard;
+  }
   const GAME = {
-    BASE: 52,        // 初始场景后退速度 px/s
-    ACCEL: 3.2,      // 每秒提速 px/s^2
-    MAX: 290,        // 最高速度
     PUSH_LETTER: 15, // 每敲对一个键，角色向前推进 px
     PUSH_CHAR: 24,   // 每完成一个字，额外推进 px
-    HEART_EVERY: 6.5,// 每隔多少秒刷新一颗心
     HP_MAX: 3,
   };
   const G = {
@@ -551,7 +560,7 @@
     const hp = Math.max(0, G.hp), empty = Math.max(0, GAME.HP_MAX - hp);
     G.el.hp.textContent = "❤️".repeat(hp) + "🖤".repeat(empty);
     G.el.score.textContent = Math.floor(G.dist / 10) + " 分";
-    G.el.v.textContent = (G.speed / GAME.BASE).toFixed(1) + "x";
+    G.el.v.textContent = (G.speed / gameCfg().base).toFixed(1) + "x";
   }
   function gameRenderBubble(bad) {
     if (!G.el) return;
@@ -572,9 +581,9 @@
     gameMeasure();
     G.ready = !!showReady;
     G.over = false;
-    G.x = 64; G.hp = GAME.HP_MAX; G.inv = 0;
+    G.x = Math.max(20, G.boxW / 2 - 15); G.hp = GAME.HP_MAX; G.inv = 0;
     G.dist = 0; G.speed = 0; G.elapsed = 0;
-    G.spawnT = GAME.HEART_EVERY * 0.6;
+    G.spawnT = gameCfg().heartEvery * 0.6;
     G.clouds.forEach((c, i) => {
       c.el.hidden = false;
       c.x = 40 + i * (G.boxW / 3) + Math.random() * 50;
@@ -625,7 +634,7 @@
       G.el.over.hidden = false;
     }
     // 重置场景：世界归零、角色回位、心与云复位
-    G.dist = 0; G.speed = 0; G.elapsed = 0; G.x = 64; G.inv = 0;
+    G.dist = 0; G.speed = 0; G.elapsed = 0; G.x = Math.max(20, G.boxW / 2 - 15); G.inv = 0;
     G.clouds.forEach((c, i) => {
       c.x = 40 + i * (G.boxW / 3);
       c.y = 8 + Math.random() * G.boxH * 0.35;
@@ -662,7 +671,8 @@
     if (!(dt > 0)) dt = 0.016;
     if (dt > 0.05) dt = 0.05;
     G.elapsed += dt;
-    G.speed = Math.min(GAME.MAX, GAME.BASE + G.elapsed * GAME.ACCEL);
+    const cf = gameCfg();
+    G.speed = Math.min(cf.max, cf.base + G.elapsed * cf.accel);
     G.dist += G.speed * dt;
     G.x -= G.speed * dt;
     if (G.inv > 0) G.inv -= dt;
@@ -670,7 +680,7 @@
     G.x = Math.max(0, Math.min(G.x, G.boxW - 30));
     // 心心刷新与回收
     G.spawnT -= dt;
-    if (G.spawnT <= 0) { G.spawnT = GAME.HEART_EVERY; gameSpawnHeart(); }
+    if (G.spawnT <= 0) { G.spawnT = cf.heartEvery; gameSpawnHeart(); }
     for (const h of G.hearts) {
       if (!h.on) continue;
       h.x -= G.speed * dt;
@@ -1523,6 +1533,11 @@
     if (!A.goodMode) { e.target.checked = false; toast("追逐模式只在好词好句里可用"); return; }
     if (e.target.checked) gameEnter();
     else { gameExit(); if (A.active && !A.finished) resumeArtTimer(); }
+  });
+  $("#art-game-diff").addEventListener("change", e => {
+    settings.articleGameDiff = e.target.value;
+    lsSet(LS_KEYS.settings, settings);
+    if (G.on) gameReset(true);
   });
 
   window.addEventListener("beforeunload", () => {

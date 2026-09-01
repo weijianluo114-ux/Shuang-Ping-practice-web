@@ -320,6 +320,16 @@
     c.el.classList.add("err");
     if (!settings.hint && c.wrongRun >= 3 && !c.revealed) revealHintFor(c);
   }
+  // 打对整字后的庆祝反馈：外框轻弹 + 向外透明扩散一圈。
+  // 强度与颜色随连续打对字数（键级 combo 折算为字级）逐级增强：
+  // lvl0 浅绿 → lvl1 绿 → lvl2 青 → lvl3 彩色循环 → lvl4 金彩发光（封顶，保持）。
+  function celebrateChar(c) {
+    if (!c || !c.el) return;
+    const lvl = Math.max(0, Math.min(4, Math.floor((A.stats.combo || 0) / 2) - 1));
+    c.el.classList.remove("pop", "lvl0", "lvl1", "lvl2", "lvl3", "lvl4");
+    void c.el.offsetWidth;
+    c.el.classList.add("pop", "lvl" + lvl);
+  }
 
   /* ---------- 实时统计 / 进度 / 速度曲线 ---------- */
   function countDone(items) {
@@ -798,6 +808,7 @@
         if (c.el) { c.el.classList.remove("err"); delete c.el.dataset.errs; }
         A.stats.itemsDone++;
         recordSpeed(hadErrs);
+        if (!hadErrs) celebrateChar(c);
         nextChar();
         return;
       }
@@ -883,7 +894,7 @@
           clearReveal(c);
         }
         p.done = false; p.typedLen = 0; p.errs = 0; p.wrongRun = 0;
-        if (p.el) p.el.classList.remove("done", "err");
+        if (p.el) p.el.classList.remove("done", "err", "pop", "lvl0", "lvl1", "lvl2", "lvl3", "lvl4");
         A.stats.itemsDone = Math.max(0, A.stats.itemsDone - 1);
         A.stats.combo = 0;
         if (A.speeds.length) { A.speeds.pop(); A.speedWrong.pop(); updateSpeedChart(); }

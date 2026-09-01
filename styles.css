@@ -443,14 +443,57 @@ footer{max-width:1060px;margin:0 0 0 132px;padding:0 22px 34px;color:var(--muted
 [data-theme="dark"] .art-text{background:#F7F2E7;color:#23261F;border-color:#E7E5DC}
 [data-theme="dark"] .art-text .ac .py{color:#8A9084}
 .ac.done .hz{color:var(--ok);font-weight:600}
+
+/* 打对整字庆祝：外框轻弹 + 透明扩散圈；连续打对逐级变色，lvl4 金彩发光封顶 */
+.ac.pop{animation:artPop .38s cubic-bezier(.2,.7,.3,1.25)}
+.ac.pop::after{content:"";position:absolute;inset:-1px;border-radius:inherit;border:2px solid var(--celebrate,var(--ok));pointer-events:none;animation:artRipple .5s ease-out forwards}
+@keyframes artPop{0%{transform:scale(1)}30%{transform:scale(var(--pop-scale,1.14))}100%{transform:scale(1)}}
+@keyframes artRipple{0%{opacity:.95;transform:scale(1)}100%{opacity:0;transform:scale(var(--ripple-scale,1.7))}}
+.ac.lvl0{--celebrate:#8FD694;--pop-scale:1.08;--ripple-scale:1.40}
+.ac.lvl1{--celebrate:#4CAF50;--pop-scale:1.12;--ripple-scale:1.60}
+.ac.lvl2{--celebrate:#00B8A9;--pop-scale:1.16;--ripple-scale:1.80}
+.ac.lvl3{--celebrate:#FF6EC7;--pop-scale:1.20;--ripple-scale:2.00}
+.ac.lvl4{--celebrate:#FFD700;--pop-scale:1.24;--ripple-scale:2.20}
+.ac.lvl0 .hz{color:#8FD694}
+.ac.lvl1 .hz{color:#4CAF50}
+.ac.lvl2 .hz{color:#00B8A9}
+.ac.lvl3 .hz{
+  background:linear-gradient(90deg,#ff6ec7,#ff9a3d,#ffe14d,#4dd0e1,#7c4dff);
+  -webkit-background-clip:text;background-clip:text;
+  -webkit-text-fill-color:transparent;color:transparent;
+  animation:artHue 2.5s linear infinite;
+}
+.ac.lvl4 .hz{
+  background:linear-gradient(180deg,#fffbe6 0%,#ffe45c 45%,#ffb300 70%,#fff3b0 100%);
+  -webkit-background-clip:text;background-clip:text;
+  -webkit-text-fill-color:transparent;color:transparent;
+  animation:artGoldGlow 1.5s ease-in-out infinite;
+}
+@keyframes artHue{to{filter:hue-rotate(360deg)}}
+@keyframes artGoldGlow{
+  0%,100%{filter:drop-shadow(0 0 2px rgba(255,200,0,.6)) brightness(1)}
+  50%{filter:drop-shadow(0 0 7px rgba(255,215,0,1)) brightness(1.15)}
+}
 .ac[data-errs="1"] .hz{color:#EF5350}
 .ac[data-errs="2"] .hz{color:#E53935}
 .ac[data-errs="3"] .hz{color:#C62828}
 .ac[data-errs="4"] .hz{color:#8B0000;font-weight:700}
 .ac.skip{color:var(--muted);opacity:.7}
 .ac.skip .py{visibility:hidden}
-.ac.err{animation:artShake .22s}
-@keyframes artShake{0%,100%{transform:translateX(0)}25%{transform:translateX(-3px)}75%{transform:translateX(3px)}}
+.ac.err{--shake-amp:3px;--shake-dur:.22s;animation:artShake var(--shake-dur) ease}
+.ac[data-errs="1"].err{--shake-amp:2px;--shake-dur:.20s}
+.ac[data-errs="2"].err{--shake-amp:4px;--shake-dur:.26s}
+.ac[data-errs="3"].err{--shake-amp:7px;--shake-dur:.32s}
+.ac[data-errs="4"].err{--shake-amp:11px;--shake-dur:.40s}
+@keyframes artShake{
+  0%,100%{transform:translateX(0)}
+  15%{transform:translateX(calc(-1 * var(--shake-amp)))}
+  30%{transform:translateX(var(--shake-amp))}
+  45%{transform:translateX(calc(-0.7 * var(--shake-amp)))}
+  60%{transform:translateX(calc(0.7 * var(--shake-amp)))}
+  75%{transform:translateX(calc(-0.35 * var(--shake-amp)))}
+  90%{transform:translateX(calc(0.35 * var(--shake-amp)))}
+}
 .art-text.nohint .py{visibility:hidden}
 .art-text.nohint .ac.reveal .py{visibility:visible;color:var(--warn, #E8A33D);font-weight:700}
 

@@ -568,6 +568,7 @@
   let gameBubbleT = 0;
   function gameReset(showReady) {
     gameStopLoop();
+    pauseArtTimer();
     gameMeasure();
     G.ready = !!showReady;
     G.over = false;
@@ -595,6 +596,7 @@
   function gameStart() {
     if (!G.on) return;
     G.playing = true; G.ready = false; G.over = false;
+    if (A.active && !A.finished) resumeArtTimer();
     G.lastTs = performance.now();
     if (G.el) G.el.ready.hidden = true;
     gameLoop(performance.now());
@@ -616,6 +618,7 @@
     if (!G.on) return;
     G.playing = false; G.over = true;
     gameStopLoop();
+    pauseArtTimer();
     gameSaveScore(Math.floor(G.dist / 10));
     if (G.el) {
       G.el.overScore.textContent = Math.floor(G.dist / 10);
@@ -1518,7 +1521,8 @@
   });
   $("#art-game").addEventListener("change", e => {
     if (!A.goodMode) { e.target.checked = false; toast("追逐模式只在好词好句里可用"); return; }
-    if (e.target.checked) gameEnter(); else gameExit();
+    if (e.target.checked) gameEnter();
+    else { gameExit(); if (A.active && !A.finished) resumeArtTimer(); }
   });
 
   window.addEventListener("beforeunload", () => {

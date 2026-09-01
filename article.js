@@ -708,6 +708,8 @@
     const el = document.getElementById("art-game-el");
     if (el) el.remove();
     G.clouds = []; G.hearts = []; G.el = null;
+    const cb = $("#art-game");
+    if (cb) cb.checked = false;
     $("#art-speed").classList.remove("game-on");
     if ($("#art-speed")) updateSpeedChart();
   }

@@ -436,7 +436,7 @@ footer{max-width:1060px;margin:0 0 0 132px;padding:0 22px 34px;color:var(--muted
 .ac .py{font-size:0.6875rem;line-height:1.1;color:var(--muted);height:0.9375rem;letter-spacing:0;font-family:ui-monospace,Consolas,Menlo,monospace;width:2.5rem;text-align:center;white-space:nowrap}
 .ac .py em{font-style:normal;padding:0 1px}
 .ac .py em.hit{color:var(--accent);font-weight:800}
-.ac .hz{line-height:1.3;font-weight:var(--art-weight,500);color:var(--muted);white-space:nowrap;transition:color .15s}
+.ac .hz{display:inline-block;line-height:1.3;font-weight:var(--art-weight,500);color:var(--muted);white-space:nowrap;transition:color .15s}
 .ac.cur{background:var(--accent-soft);box-shadow:0 0 0 2px var(--accent);border-radius:8px}
 .ac.cur .hz{color:#111}
 /* 文章正文始终为护眼纸色：即使用户系统/页面是深色主题，阅读区也保持浅纸色+黑字 */
@@ -444,27 +444,44 @@ footer{max-width:1060px;margin:0 0 0 132px;padding:0 22px 34px;color:var(--muted
 [data-theme="dark"] .art-text .ac .py{color:#8A9084}
 .ac.done .hz{color:var(--ok);font-weight:600}
 
-/* 打对整字庆祝：外框轻弹 + 透明扩散圈；连续打对逐级变色，lvl4 金彩发光封顶 */
-.ac.pop{animation:artPop .38s cubic-bezier(.2,.7,.3,1.25)}
-.ac.pop::after{content:"";position:absolute;inset:-1px;border-radius:inherit;border:2px solid var(--celebrate,var(--ok));pointer-events:none;animation:artRipple .5s ease-out forwards}
-@keyframes artPop{0%{transform:scale(1)}30%{transform:scale(var(--pop-scale,1.14))}100%{transform:scale(1)}}
-@keyframes artRipple{0%{opacity:.95;transform:scale(1)}100%{opacity:0;transform:scale(var(--ripple-scale,1.7))}}
+/* 打对整字庆祝：只对「字」做轻微弹跳，外框不动；连续打对逐级变色共6级，lvl5 炽金封顶 */
+.ac.pop .hz{animation:artCharPop .32s ease}
+@keyframes artCharPop{0%{transform:scale(1)}40%{transform:scale(1.16)}100%{transform:scale(1)}}
 /* 正反馈色阶参考经典游戏稀有度梯度（Diablo 1996 开创 / WoW 等发扬）：
-   绿 uncommon → 蓝 rare → 紫 legendary → 橙 epic → 金 mythic。
+   绿 uncommon → 蓝 rare → 紫 legendary → 橙 epic → 金 mythic → 炽金。
    纯色高对比，适配护眼纸 #F7F2E7，避免彩虹闪烁与渐变糊字。 */
-.ac.lvl0{--celebrate:#1E7A36;--pop-scale:1.08;--ripple-scale:1.40}
-.ac.lvl1{--celebrate:#1557B0;--pop-scale:1.12;--ripple-scale:1.60}
-.ac.lvl2{--celebrate:#7B2E9E;--pop-scale:1.16;--ripple-scale:1.80}
-.ac.lvl3{--celebrate:#B84800;--pop-scale:1.20;--ripple-scale:2.00}
-.ac.lvl4{--celebrate:#8F6200;--pop-scale:1.24;--ripple-scale:2.20}
+.ac.lvl0{--celebrate:#1E7A36}
+.ac.lvl1{--celebrate:#1557B0}
+.ac.lvl2{--celebrate:#7B2E9E}
+.ac.lvl3{--celebrate:#B84800}
+.ac.lvl4{--celebrate:#8F6200}
+.ac.lvl5{--celebrate:#D4880F}
 .ac.lvl0 .hz{color:#1E7A36}
 .ac.lvl1 .hz{color:#1557B0}
 .ac.lvl2 .hz{color:#7B2E9E}
 .ac.lvl3 .hz{color:#B84800;font-weight:700}
-.ac.lvl4 .hz{color:#8F6200;font-weight:800;animation:artGoldGlow 1.6s ease-in-out infinite}
+.ac.lvl4 .hz{color:#8F6200;font-weight:800;animation:artCharPop .32s ease,artGoldGlow 1.6s ease-in-out infinite}
+.ac.lvl5 .hz{color:#8F6200;font-weight:800;animation:artCharPop .32s ease,artGoldGlow5 1.1s ease-in-out infinite}
 @keyframes artGoldGlow{
   0%,100%{text-shadow:0 0 5px rgba(212,160,23,.35);filter:brightness(1)}
   50%{text-shadow:0 0 9px rgba(230,180,40,.6);filter:brightness(1.06)}
+}
+@keyframes artGoldGlow5{
+  0%,100%{text-shadow:0 0 5px rgba(212,160,23,.45),0 0 10px rgba(255,120,0,.18);filter:brightness(1)}
+  50%{text-shadow:0 0 9px rgba(255,190,40,.9),0 0 18px rgba(255,140,0,.45);filter:brightness(1.1)}
+}
+/* 连续打对时，前面已打对的字开始燃烧：小火苗在字角跳动，等级越高火苗越大 */
+.ac.burn .hz{position:relative}
+.ac.burn .hz::after{
+  content:"🔥";position:absolute;top:-0.62em;right:-0.42em;font-size:0.36em;line-height:1;
+  animation:artFlame .55s ease-in-out infinite;transform-origin:bottom center;pointer-events:none;
+}
+.ac.lvl3.burn .hz::after{font-size:0.44em}
+.ac.lvl4.burn .hz::after{font-size:0.50em}
+.ac.lvl5.burn .hz::after{font-size:0.56em}
+@keyframes artFlame{
+  0%,100%{transform:translateY(0) scale(1) rotate(-4deg);opacity:.85}
+  50%{transform:translateY(-2px) scale(1.3) rotate(4deg);opacity:1}
 }
 .ac[data-errs="1"] .hz{color:#EF5350}
 .ac[data-errs="2"] .hz{color:#E53935}

@@ -440,12 +440,17 @@
   }
 
   /* ---------- 好词好句 · 追逐小游戏 ---------- */
+  // 速度上限反推：双拼每字约2键，每键推进15px、每字额外24px → 每字约54px。
+  // 顶尖双拼可持续约120字/分钟 → 推进力≈120/60*54=108px/s；普通人40字/分钟≈36px/s。
+  // 因此上限取 60(简单)~110(噩梦)，最高档仍略低于人类可持续峰值，给高手留余量。
   const GAME_DIFFS = {
-    easy:      { label: "简单", base: 36, accel: 2.0, max: 180, heartEvery: 4.5 },
-    normal:    { label: "普通", base: 44, accel: 2.6, max: 235, heartEvery: 5.5 },
-    hard:      { label: "困难", base: 52, accel: 3.2, max: 290, heartEvery: 6.5 },
-    nightmare: { label: "噩梦", base: 64, accel: 4.0, max: 340, heartEvery: 8.5 },
+    easy:      { label: "简单", base: 30, rightAccel: 0.60, leftAccel: 0.35, surviveT: 6.0, max: 60,  heartEvery: 4.5 },
+    normal:    { label: "普通", base: 36, rightAccel: 0.80, leftAccel: 0.45, surviveT: 5.0, max: 75,  heartEvery: 5.5 },
+    hard:      { label: "困难", base: 42, rightAccel: 1.00, leftAccel: 0.55, surviveT: 4.0, max: 90,  heartEvery: 6.5 },
+    nightmare: { label: "噩梦", base: 48, rightAccel: 1.30, leftAccel: 0.70, surviveT: 3.0, max: 110, heartEvery: 8.5 },
   };
+  // 扣血减速比例：逐次递减，第5次及以后不再减速
+  const GAME_SLOW_RATIO = [0.30, 0.20, 0.12, 0.06, 0];
   function gameCfg() {
     return GAME_DIFFS[settings.articleGameDiff] || GAME_DIFFS.hard;
   }
@@ -458,6 +463,9 @@
     on: false, playing: false, ready: false, over: false,
     x: 64, hp: GAME.HP_MAX, inv: 0, dist: 0, speed: 0, elapsed: 0,
     lastTs: 0, raf: 0, spawnT: 0, boxW: 300, boxH: 120,
+    hitCount: 0,   // 累计扣血次数，决定减速比例（逐次递减）
+    surviveT: 0,   // 在左半部分无伤生存的累计时间
+    lockT: 0,      // 扣血后的加速锁定时间
     clouds: [], hearts: [], el: null,
   };
 
@@ -560,7 +568,7 @@
     const hp = Math.max(0, G.hp), empty = Math.max(0, GAME.HP_MAX - hp);
     G.el.hp.textContent = "❤️".repeat(hp) + "🖤".repeat(empty);
     G.el.score.textContent = Math.floor(G.dist / 10) + " 分";
-    G.el.v.textContent = (G.speed / gameCfg().base).toFixed(1) + "x";
+    G.el.v.textContent = (G.speed / gameCfg().base).toFixed(2) + "x";
   }
   function gameRenderBubble(bad) {
     if (!G.el) return;
@@ -583,6 +591,7 @@
     G.over = false;
     G.x = Math.max(20, G.boxW / 2 - 15); G.hp = GAME.HP_MAX; G.inv = 0;
     G.dist = 0; G.speed = 0; G.elapsed = 0;
+    G.hitCount = 0; G.surviveT = 0; G.lockT = 0;
     G.spawnT = gameCfg().heartEvery * 0.6;
     G.clouds.forEach((c, i) => {
       c.el.hidden = false;
@@ -605,6 +614,7 @@
   function gameStart() {
     if (!G.on) return;
     G.playing = true; G.ready = false; G.over = false;
+    G.speed = gameCfg().base;
     if (A.active && !A.finished) resumeArtTimer();
     G.lastTs = performance.now();
     if (G.el) G.el.ready.hidden = true;
@@ -612,8 +622,14 @@
   }
   function gameHitWall() {
     if (G.inv > 0 || G.over || !G.playing) return;
+    const cf = gameCfg();
+    const ratio = GAME_SLOW_RATIO[Math.min(G.hitCount, GAME_SLOW_RATIO.length - 1)] || 0;
+    if (ratio > 0) G.speed = Math.max(cf.base, G.speed * (1 - ratio));
+    G.hitCount++;
     G.hp--;
     G.inv = 1.2;
+    G.lockT = 1.2;    // 扣血后短暂停止所有加速
+    G.surviveT = 0;   // 左半无伤计时清零
     G.x = 44;
     gameUpdateHud();
     if (G.el && G.el.scene) {
@@ -635,6 +651,7 @@
     }
     // 重置场景：世界归零、角色回位、心与云复位
     G.dist = 0; G.speed = 0; G.elapsed = 0; G.x = Math.max(20, G.boxW / 2 - 15); G.inv = 0;
+    G.hitCount = 0; G.surviveT = 0; G.lockT = 0;
     G.clouds.forEach((c, i) => {
       c.x = 40 + i * (G.boxW / 3);
       c.y = 8 + Math.random() * G.boxH * 0.35;
@@ -672,7 +689,17 @@
     if (dt > 0.05) dt = 0.05;
     G.elapsed += dt;
     const cf = gameCfg();
-    G.speed = Math.min(cf.max, cf.base + G.elapsed * cf.accel);
+    // 加速度：右半部分 → 背景更快后移；左半无伤生存一段时间 → 开始加速。
+    // 扣血后的 lockT 内停止加速；总加速度已大幅下调（0.35~1.30 px/s²，约为旧版的 1/3）。
+    if (G.lockT > 0) G.lockT -= dt;
+    let accel = 0;
+    if (G.x > G.boxW / 2) {
+      accel = cf.rightAccel;
+    } else {
+      G.surviveT += dt;
+      if (G.surviveT >= cf.surviveT) accel = cf.leftAccel;
+    }
+    G.speed = Math.min(cf.max, Math.max(cf.base, G.speed + accel * dt));
     G.dist += G.speed * dt;
     G.x -= G.speed * dt;
     if (G.inv > 0) G.inv -= dt;

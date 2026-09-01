@@ -676,7 +676,9 @@
     if (!h) return;
     h.on = true;
     h.x = G.boxW + 6;
-    h.y = 18 + Math.random() * Math.max(10, G.boxH * 0.45);
+    // 心心与玩家（角色）保持同一水平线：角色 bottom:26px、高约24px，
+    // 中心约在 boxH-38；心心高约17px，取 y=boxH-39 使两者中心基本对齐，保证能吃得到。
+    h.y = Math.max(10, G.boxH - 39);
     h.el.hidden = false;
     h.el.style.top = h.y + "px";
     h.el.style.transform = `translate3d(${h.x}px,0,0)`;

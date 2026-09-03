@@ -205,6 +205,8 @@ main{max-width:none;margin:0 0 0 132px;padding:18px 0 60px}
 .live-stats .chip b{color:var(--text)}
 .live-stats .chip .ok{color:var(--ok)}
 .live-stats .chip .bad{color:var(--bad)}
+.live-stats .chip.paused{background:var(--warn, #E8A33D);color:#fff}
+.live-stats .chip.paused b{color:#fff}
 .progress-bar{height:8px;background:var(--bg);border-radius:999px;overflow:hidden;margin-bottom:18px}
 .progress-bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .18s}
 .stage{
@@ -373,6 +375,7 @@ footer{max-width:1060px;margin:0 0 0 132px;padding:0 22px 34px;color:var(--muted
 .mini-row select{flex:1;min-width:0;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:5px 8px;font-size:0.8125rem}
 .art-side-actions{display:flex;flex-direction:column;gap:8px;width:100%}
 .art-side-actions .btn{width:100%;text-align:center}
+#btn-art-pause.paused{background:var(--warn, #E8A33D);border-color:var(--warn, #E8A33D);color:#fff}
 .art-center{min-width:0;display:flex;flex-direction:column;gap:12px;width:100%;max-width:820px;margin:0 auto;margin-top:-6px}
 /* 右侧栏：实时统计竖排贴右 */
 .art-side.right .live-stats{margin:0;display:flex;flex-direction:column;align-items:stretch;width:100%;gap:8px}

@@ -24,6 +24,7 @@
     active: false,
     finished: false,
     started: false,
+    paused: false,       // 暂停统计：暂停后右侧统计与计时全部冻结，直到继续/重新打字
     stats: null,         // {correct,wrong,itemsDone,bestCombo,combo,wrongKeys}（仅本次会话）
     lastSource: null,    // { title, byline, paragraphs }
     lastSourceId: null,  // 上次练习的内置文章 id（无 id 的为 null）
@@ -96,6 +97,39 @@
     }, ART_IDLE_PAUSE_MS);
   }
 
+  /* ---------- 暂停 / 继续 ----------
+     暂停后右侧统计与计时全部冻结；重新打字、点继续按钮或再按空格键即恢复。
+     游戏模式下暂停会同时停住游戏场景（角色不再后退），继续后从原状态接着跑。 */
+  function updatePauseBtn() {
+    const b = $("#btn-art-pause");
+    if (!b) return;
+    b.textContent = A.paused ? "▶ 继续 (空格)" : "⏸ 暂停 (空格)";
+    b.classList.toggle("paused", !!A.paused);
+  }
+  function pauseArticle() {
+    if (!A.active || A.finished || A.paused) return;
+    A.paused = true;
+    pauseArtTimer();
+    if (G.on && G.playing) gameStopLoop();
+    updatePauseBtn();
+    updateLive();
+  }
+  function resumeArticle() {
+    if (!A.active || A.finished || !A.paused) return;
+    A.paused = false;
+    if (A.started) resumeArtTimer();
+    if (G.on && !G.over && !G.ready && !G.playing) {
+      G.playing = true;
+      G.lastTs = performance.now();
+      gameLoop(performance.now());
+    }
+    updatePauseBtn();
+    updateLive();
+  }
+  function toggleArticlePause() {
+    if (A.paused) resumeArticle(); else pauseArticle();
+  }
+
   /* ---------- 拼音/转码 ---------- */
   function singlePy(ch) {
     try {
@@ -142,7 +176,7 @@
     A.total = total;
     A.baseDone = 0;
     A.sessionStartIdx = first;
-    A.active = true; A.finished = false; A.started = false;
+    A.active = true; A.finished = false; A.started = false; A.paused = false;
     A.stats = { correct: 0, wrong: 0, itemsDone: 0, bestCombo: 0, combo: 0, wrongKeys: {} };
     A.goodMerged = null;
     A.goodSegItems = 0; A.goodSegMs = 0;
@@ -169,6 +203,7 @@
     renderText();
     updateLive();
     updateSpeedChart();
+    updatePauseBtn();
     return true;
   }
 
@@ -370,8 +405,10 @@
     const accClass = acc >= 95 ? "ok" : (acc >= 85 ? "" : "bad");
     const segInfo = `<span class="chip">全文</span>`;
     const goodChip = A.goodMode && A.good ? `<span class="chip">💎 已练 <b>${A.good.total}</b> 句</span>` : "";
+    const pausedChip = A.paused ? `<span class="chip paused">⏸ 已暂停</span>` : "";
     $("#art-live").innerHTML = `
       ${goodChip}
+      ${pausedChip}
       ${segInfo}
       <span class="chip">完成 <b>${done}</b>/${total}</span>
       <span class="chip">⏱ <b>${fmtTime(elapsed)}</b></span>
@@ -929,6 +966,7 @@
     if (A.finished) return;
     A.finished = true;
     A.active = false;
+    A.paused = false;
     pauseArtTimer();
     const elapsed = artElapsed();
     const ks = A.stats.correct + A.stats.wrong;
@@ -974,7 +1012,7 @@
       }
       if (A.goodMode) goodMergeStats();
     }
-    A.active = false; A.finished = false; A.started = false;
+    A.active = false; A.finished = false; A.started = false; A.paused = false;
     A.goodMode = false;
     gameExit();
     A.goodPrefetching = false;
@@ -1542,6 +1580,8 @@
   }
   function onKey(e) {
     if (!A.active || A.finished || !A.session) return;
+    if (e.key === " " || e.key === "Spacebar" || e.code === "Space") { e.preventDefault(); toggleArticlePause(); return; }
+    if (A.paused) resumeArticle(); // 暂停状态下重新打字：自动继续统计并处理本次按键
     if (e.key === "Backspace") { e.preventDefault(); if (G.on) return; startIfNeeded(); stepBack(); return; }
     if (/^[a-zA-Z;]$/.test(e.key)) {
       startIfNeeded();
@@ -1582,6 +1622,7 @@
     }
     if (card.dataset.cat) startSentenceSet(card.dataset.cat);
   });
+  $("#btn-art-pause").addEventListener("click", toggleArticlePause);
   $("#btn-art-exit").addEventListener("click", exitToList);
   $("#btn-art-list-side").addEventListener("click", exitToList);
   $("#btn-art-restart").addEventListener("click", restartLast);

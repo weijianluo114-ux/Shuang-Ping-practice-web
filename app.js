@@ -832,11 +832,36 @@ function showStTip(dot, e) {
   tip.classList.add("show");
   moveStTip(e);
 }
-function bindStDots(el) {
-  el.querySelectorAll(".st-dot").forEach(dot => {
-    dot.addEventListener("mouseenter", e => showStTip(dot, e));
-    dot.addEventListener("mousemove", e => moveStTip(e));
-    dot.addEventListener("mouseleave", () => { if (stTipEl) stTipEl.classList.remove("show"); });
+let stChart = null;
+function bindStChart(el) {
+  const svg = el.querySelector(".st-wrap svg");
+  if (!svg) return;
+  const dots = Array.from(el.querySelectorAll(".st-dot"));
+  const xy = stChart && stChart.xy ? stChart.xy : [];
+  let hot = null;
+  svg.addEventListener("mousemove", e => {
+    if (!xy.length) return;
+    const rect = svg.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    const vx = (e.clientX - rect.left) / rect.width * 720;
+    const vy = (e.clientY - rect.top) / rect.height * 230;
+    let bi = 0, bd = Infinity;
+    for (let i = 0; i < xy.length; i++) {
+      const dx = vx - xy[i][0];
+      const dy = (vy - xy[i][1]) * 2.2;
+      const d = dx * dx + dy * dy;
+      if (d < bd) { bd = d; bi = i; }
+    }
+    const dot = dots[bi];
+    if (!dot) return;
+    if (hot && hot !== dot) hot.classList.remove("hot");
+    dot.classList.add("hot");
+    hot = dot;
+    showStTip(dot, e);
+  });
+  svg.addEventListener("mouseleave", () => {
+    if (hot) { hot.classList.remove("hot"); hot = null; }
+    if (stTipEl) stTipEl.classList.remove("show");
   });
 }
 function renderSpeedTrend() {
@@ -890,9 +915,10 @@ function renderSpeedTrend() {
   const line = smoothPath(xy);
   const baseY = padT + plotH;
   const area = `${line} L ${xy[xy.length - 1][0].toFixed(1)},${baseY.toFixed(1)} L ${xy[0][0].toFixed(1)},${baseY.toFixed(1)} Z`;
-  // 点稀疏时用大点方便悬停，点密集（如3个月/6个月/全部）时缩小，避免圈圈挤在一起难以选择
-  const dotR = pts.length > 60 ? 3 : 5.5;
-  const dots = xy.map(([x, y], i) => `<circle class="st-dot" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${dotR}" data-key="${pts[i].key}" data-speed="${pts[i].speed}"></circle>`).join("");
+  // 点稀疏时用大点方便悬停；点密集（3个月/6个月/全部）时逐档缩小并去描边，避免圈圈挤在一起难以选择
+  const dotR = pts.length <= 31 ? 5.5 : pts.length <= 70 ? 3.5 : pts.length <= 140 ? 2.6 : 2;
+  const dense = pts.length > 60 ? " dense" : "";
+  const dots = xy.map(([x, y], i) => `<circle class="st-dot${dense}" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${dotR}" data-key="${pts[i].key}" data-speed="${pts[i].speed}"></circle>`).join("");
   const grid = [0.25, 0.5, 0.75].map(f => {
     const y = padT + plotH - f * plotH;
     return `<line x1="${padL}" y1="${y.toFixed(1)}" x2="${W - padR}" y2="${y.toFixed(1)}" class="grid"><title>${Math.round(max * f)} 字/分</title></line>`;
@@ -918,7 +944,8 @@ function renderSpeedTrend() {
       </svg>
     </div>`;
   if (stTipEl) stTipEl.classList.remove("show");
-  bindStDots(el);
+  stChart = { pts, xy };
+  bindStChart(el);
 }
 function renderStats() {
   const st = loadStats();

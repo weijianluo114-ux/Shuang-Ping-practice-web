@@ -292,6 +292,8 @@ main{max-width:none;margin:0 0 0 132px;padding:18px 0 60px}
 .st-wrap circle{fill:var(--accent);stroke:var(--card);stroke-width:1.5}
 .st-wrap circle.st-dot{cursor:pointer;transform-box:fill-box;transform-origin:center;transition:transform .18s ease,filter .18s ease,stroke .18s ease,stroke-width .18s ease}
 .st-wrap circle.st-dot:hover{transform:scale(1.7);stroke:var(--text);stroke-width:2.5;filter:drop-shadow(0 4px 10px rgba(0,0,0,.18))}
+.st-wrap circle.st-dot.dense{stroke-width:0}
+.st-wrap circle.st-dot.hot{transform:scale(2.1);stroke:var(--text);stroke-width:2;filter:drop-shadow(0 4px 10px rgba(0,0,0,.18))}
 .st-wrap .grid{stroke:var(--line);stroke-width:1;stroke-dasharray:3 4}
 .st-wrap .axis{fill:var(--muted);font-size:11px}
 /* 趋势图悬浮提示卡：大号速度数字，替代浏览器原生小 title */

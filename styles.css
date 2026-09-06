@@ -290,8 +290,22 @@ main{max-width:none;margin:0 0 0 132px;padding:18px 0 60px}
 .st-wrap .area{fill:var(--accent-soft)}
 .st-wrap .line{fill:none;stroke:var(--accent);stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
 .st-wrap circle{fill:var(--accent);stroke:var(--card);stroke-width:1.5}
+.st-wrap circle.st-dot{cursor:pointer;transform-box:fill-box;transform-origin:center;transition:transform .18s ease,filter .18s ease,stroke .18s ease,stroke-width .18s ease}
+.st-wrap circle.st-dot:hover{transform:scale(1.7);stroke:var(--text);stroke-width:2.5;filter:drop-shadow(0 4px 10px rgba(0,0,0,.18))}
 .st-wrap .grid{stroke:var(--line);stroke-width:1;stroke-dasharray:3 4}
 .st-wrap .axis{fill:var(--muted);font-size:11px}
+/* 趋势图悬浮提示卡：大号速度数字，替代浏览器原生小 title */
+.st-tip{
+  position:fixed;z-index:99;pointer-events:none;display:none;
+  flex-direction:column;align-items:flex-start;gap:2px;
+  background:var(--card);border:1px solid var(--line);border-left:4px solid var(--accent);
+  border-radius:14px;box-shadow:var(--shadow),0 12px 32px rgba(0,0,0,.12);
+  padding:12px 18px;min-width:132px;
+}
+.st-tip.show{display:flex}
+.st-tip .k{font-size:0.82rem;color:var(--muted);letter-spacing:.03em}
+.st-tip b{font-size:1.75rem;line-height:1.1;color:var(--accent);font-weight:800}
+.st-tip .u{font-size:0.9rem;color:var(--text);font-weight:600}
 
 /* ===== 弹窗 ===== */
 .modal-backdrop{

@@ -804,6 +804,41 @@ function smoothPath(pts) {
   return d;
 }
 let speedTrendRange = "30";
+/* 速度趋势图悬浮提示卡（替换原生 <title> 小提示） */
+let stTipEl = null;
+function stTip() {
+  if (!stTipEl) {
+    stTipEl = document.createElement("div");
+    stTipEl.className = "st-tip";
+    stTipEl.setAttribute("role", "tooltip");
+    document.body.appendChild(stTipEl);
+  }
+  return stTipEl;
+}
+function moveStTip(e) {
+  const tip = stTip();
+  const pad = 16;
+  let x = e.clientX + pad, y = e.clientY - tip.offsetHeight - 10;
+  const r = tip.getBoundingClientRect();
+  if (x + r.width > window.innerWidth - 10) x = e.clientX - r.width - pad;
+  if (y < 10) y = e.clientY + pad;
+  if (y + r.height > window.innerHeight - 10) y = e.clientY - r.height - pad;
+  tip.style.left = Math.max(6, x) + "px";
+  tip.style.top = Math.max(6, y) + "px";
+}
+function showStTip(dot, e) {
+  const tip = stTip();
+  tip.innerHTML = `<span class="k">${dot.dataset.key}</span><b>${dot.dataset.speed}</b><span class="u">字/分</span>`;
+  tip.classList.add("show");
+  moveStTip(e);
+}
+function bindStDots(el) {
+  el.querySelectorAll(".st-dot").forEach(dot => {
+    dot.addEventListener("mouseenter", e => showStTip(dot, e));
+    dot.addEventListener("mousemove", e => moveStTip(e));
+    dot.addEventListener("mouseleave", () => { if (stTipEl) stTipEl.classList.remove("show"); });
+  });
+}
 function renderSpeedTrend() {
   const el = document.getElementById("stats-speed");
   if (!el) return;
@@ -855,7 +890,7 @@ function renderSpeedTrend() {
   const line = smoothPath(xy);
   const baseY = padT + plotH;
   const area = `${line} L ${xy[xy.length - 1][0].toFixed(1)},${baseY.toFixed(1)} L ${xy[0][0].toFixed(1)},${baseY.toFixed(1)} Z`;
-  const dots = xy.map(([x, y], i) => `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3"><title>${pts[i].key} · ${pts[i].speed} 字/分</title></circle>`).join("");
+  const dots = xy.map(([x, y], i) => `<circle class="st-dot" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="5.5" data-key="${pts[i].key}" data-speed="${pts[i].speed}"></circle>`).join("");
   const grid = [0.25, 0.5, 0.75].map(f => {
     const y = padT + plotH - f * plotH;
     return `<line x1="${padL}" y1="${y.toFixed(1)}" x2="${W - padR}" y2="${y.toFixed(1)}" class="grid"><title>${Math.round(max * f)} 字/分</title></line>`;
@@ -880,6 +915,8 @@ function renderSpeedTrend() {
         <text x="${padL - 6}" y="${baseY + 4}" class="axis" text-anchor="end">0</text>
       </svg>
     </div>`;
+  if (stTipEl) stTipEl.classList.remove("show");
+  bindStDots(el);
 }
 function renderStats() {
   const st = loadStats();

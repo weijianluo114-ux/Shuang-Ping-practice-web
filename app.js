@@ -890,7 +890,9 @@ function renderSpeedTrend() {
   const line = smoothPath(xy);
   const baseY = padT + plotH;
   const area = `${line} L ${xy[xy.length - 1][0].toFixed(1)},${baseY.toFixed(1)} L ${xy[0][0].toFixed(1)},${baseY.toFixed(1)} Z`;
-  const dots = xy.map(([x, y], i) => `<circle class="st-dot" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="5.5" data-key="${pts[i].key}" data-speed="${pts[i].speed}"></circle>`).join("");
+  // 点稀疏时用大点方便悬停，点密集（如3个月/6个月/全部）时缩小，避免圈圈挤在一起难以选择
+  const dotR = pts.length > 60 ? 3 : 5.5;
+  const dots = xy.map(([x, y], i) => `<circle class="st-dot" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${dotR}" data-key="${pts[i].key}" data-speed="${pts[i].speed}"></circle>`).join("");
   const grid = [0.25, 0.5, 0.75].map(f => {
     const y = padT + plotH - f * plotH;
     return `<line x1="${padL}" y1="${y.toFixed(1)}" x2="${W - padR}" y2="${y.toFixed(1)}" class="grid"><title>${Math.round(max * f)} 字/分</title></line>`;
